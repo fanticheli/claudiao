@@ -324,6 +324,19 @@ claudiao update
 claudiao doctor
 ```
 
+## Cloud Specialists + CLI direto
+
+O toolkit inclui um **[guia completo de integração com CLIs de cloud](./templates/CLOUD-CLI-GUIDE.md)** — o caso de uso mais poderoso dos agents. Com a CLI da AWS, GCP ou Azure autenticada, o Claude Code investiga erros, valida arquitetura, analisa logs e custos, tudo via conversa natural:
+
+```
+você: "o ECS task tá reiniciando, investiga"
+       → aws-specialist roda describe-tasks, tail de logs, métricas de memória
+       → diagnóstico: "OOM kill — container com 480MB de 512MB de limit"
+       → sugestão: "aumente memoryReservation pra 1024"
+```
+
+O guia cobre: setup de autenticação (SSO, OAuth), permissões recomendadas, 10+ cenários reais com exemplos, MCP servers, e checklist de segurança.
+
 ## Guia de best practices
 
 O projeto inclui um **[guia completo de best practices](./templates/CLAUDE-CODE-BEST-PRACTICES.md)** com:

@@ -283,10 +283,12 @@ Os 18 agentes são invocados **automaticamente** pelo Claude Code quando detecta
 > "Esse componente tá renderizando demais"           → react-specialist
 > "Query tá lenta, como otimizar?"                   → database-specialist
 
-# Cloud
+# Cloud (ver guia completo: CLOUD-CLI-GUIDE.md)
 > "Preciso deployar isso na AWS com Fargate"         → aws-specialist
 > "Configura um App Service na Azure"                → azure-specialist
 > "Melhor opção de hosting no GCP pra isso?"         → gcp-specialist
+> "O ECS task tá reiniciando, investiga"             → aws-specialist (usa CLI direto)
+> "Busca erros no Cloud Run nas últimas 2h"          → gcp-specialist (usa CLI direto)
 
 # Qualidade
 > "Faz review dessa PR"                              → pr-reviewer
