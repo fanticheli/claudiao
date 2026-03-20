@@ -1,0 +1,47 @@
+{
+  "name": "claudiao",
+  "version": "1.0.0",
+  "description": "Seu Claude Code com esteroides. Agentes, skills e plugins em um comando.",
+  "type": "module",
+  "bin": {
+    "claudiao": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "prepublishOnly": "npm run build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "ai",
+    "agents",
+    "skills",
+    "cli",
+    "developer-tools"
+  ],
+  "author": "Igor Fanticheli",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "dependencies": {
+    "@sindresorhus/slugify": "^3.0.0",
+    "chalk": "^5.3.0",
+    "commander": "^13.1.0",
+    "gray-matter": "^4.0.3",
+    "inquirer": "^12.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0",
+    "vitest": "^4.1.0"
+  }
+}
