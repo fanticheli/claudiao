@@ -1,7 +1,7 @@
 {
   "name": "claudiao",
   "version": "1.0.0",
-  "description": "Seu Claude Code com esteroides. Agentes, skills e plugins em um comando.",
+  "description": "Seu Claude Code no próximo nível. Agentes, skills e plugins em um comando.",
   "type": "module",
   "bin": {
     "claudiao": "dist/index.js"

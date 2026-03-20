@@ -2,7 +2,7 @@
 
 CLI que instala e gerencia agentes, skills e plugins para o [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
-> Seu Claude Code com esteroides. **18 agentes + 9 skills + 3 plugins + CLAUDE.md global + wizard de criação + doctor** — tudo em um comando.
+> Seu Claude Code no próximo nível. **18 agentes + 9 skills + 3 plugins + CLAUDE.md global + wizard de criação + doctor** — tudo em um comando.
 
 ## Pra quem é isso?
 

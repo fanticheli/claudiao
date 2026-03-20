@@ -20,7 +20,7 @@ const program = new Command();
 
 program
   .name('claudiao')
-  .description('Seu Claude Code com esteroides. Agentes, skills e plugins em um comando.')
+  .description('Seu Claude Code no próximo nível. Agentes, skills e plugins em um comando.')
   .version(pkg.version);
 
 // ============================================================

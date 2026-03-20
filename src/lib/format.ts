@@ -4,7 +4,7 @@ export function banner(): void {
   console.log('');
   console.log(chalk.blue('╔═══════════════════════════════════════════╗'));
   console.log(chalk.blue('║                                           ║'));
-  console.log(chalk.blue('║   ') + chalk.bold('claudiao') + chalk.dim(' — Claude com esteroides') + chalk.blue('          ║'));
+  console.log(chalk.blue('║   ') + chalk.bold('claudiao') + chalk.dim(' — Claude no próximo nível') + chalk.blue('        ║'));
   console.log(chalk.blue('║                                           ║'));
   console.log(chalk.blue('╚═══════════════════════════════════════════╝'));
   console.log('');
