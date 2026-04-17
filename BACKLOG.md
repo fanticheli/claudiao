@@ -70,6 +70,39 @@
 - `claudiao list agents` mostra status (ativo/inativo)
 - Persistir estado no `.claudiao.json`
 
+### FEAT-021: Hooks do claudião (forçar skills em momentos críticos)
+**Descrição:** Instalar hooks em `~/.claude/settings.json` que lembram o user
+de invocar skills em momentos específicos — transformando skills de opt-in
+em opt-out.
+**Motivação:** Validação da lib mostrou que skills e agentes não auto-ativam
+por contexto. Nada força `/security-checklist` antes de PR, nem
+`/ui-review-checklist` após editar componente. Hooks resolvem sem exigir
+disciplina do user.
+**Escopo:**
+- `claudiao hooks install` → adiciona hooks em `~/.claude/settings.json` (merge, não overwrite)
+- `claudiao hooks uninstall` → remove apenas os hooks do claudião (identificados por comentário/marker)
+- `claudiao hooks list` → mostra quais hooks estão ativos
+- Templates de hook bundled em `templates/hooks/`:
+  - **`pre-write-endpoint.sh`**: ao editar arquivo em `routes/`, `controllers/`, `handlers/`, exibe lembrete "rodou /security-checklist?"
+  - **`pre-write-component.sh`**: ao editar `.tsx`/`.jsx`, lembra `/ui-review-checklist`
+  - **`pre-migration.sh`**: ao criar arquivo em `migrations/`, lembra `/sql-templates` (expand-contract)
+  - **`post-commit.sh`**: valida se conventional commit foi respeitado
+- Opt-in por tipo: `claudiao hooks install --only security,ui` (lista de categorias)
+- Documentar override: user pode editar `~/.claude/hooks/claudiao-*.sh` pra customizar
+**Dependências:** nenhuma — hooks do Claude Code já suportam matchers por tool name.
+
+### FEAT-022: Validação de frontmatter em `claudiao doctor`
+**Descrição:** O `doctor` hoje checa symlinks e paths, mas não valida se o
+frontmatter dos agents/skills está completo.
+**Motivação:** Agentes com frontmatter incompleto (falta `description` clara,
+falta `model`) funcionam, mas deixam triggers inconsistentes. Validação
+proativa evita falha silenciosa na ativação.
+**Escopo:**
+- `doctor` roda gray-matter em todo agent/skill instalado
+- Valida: `name`, `description` (>50 chars), `model`, `tools`/`allowed-tools`
+- Warn se descrição não tem trigger explícito ("when user says", "use when")
+- Flag `--fix` sugere correções
+
 ---
 
 ## P2 — Melhorias de médio prazo
