@@ -11,6 +11,7 @@ import { doctor } from './commands/doctor.js';
 import { removeAgent, removeSkill } from './commands/remove.js';
 import { update } from './commands/update.js';
 import { installPlugin } from './commands/install-plugin.js';
+import { installHooks, uninstallHooks, listHooks } from './commands/hooks.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -160,6 +161,43 @@ program
   .description('Verifica se tudo esta instalado e funcionando corretamente')
   .action(() => {
     doctor();
+  });
+
+// ============================================================
+// hooks
+// ============================================================
+const hooks = program
+  .command('hooks')
+  .description('Gerencia hooks do claudiao que lembram skills em momentos criticos');
+
+hooks
+  .command('install')
+  .description('Instala hooks que lembram /security-checklist, /ui-review-checklist, etc')
+  .option('--only <categories>', 'Instala apenas categorias especificas (ex: security,ui)')
+  .option('--dry-run', 'Mostra o que seria feito sem executar')
+  .addHelpText('after', `
+Exemplos:
+  claudiao hooks install
+  claudiao hooks install --only security,migration
+  claudiao hooks install --dry-run
+  `)
+  .action(async (options: { only?: string; dryRun?: boolean }) => {
+    await installHooks(options);
+  });
+
+hooks
+  .command('uninstall')
+  .description('Remove hooks do claudiao de settings.json (preserva hooks de outros plugins)')
+  .option('-y, --yes', 'Pula confirmacao interativa')
+  .action(async (options: { yes?: boolean }) => {
+    await uninstallHooks(options);
+  });
+
+hooks
+  .command('list')
+  .description('Lista hooks do claudiao atualmente instalados')
+  .action(() => {
+    listHooks();
   });
 
 // ============================================================

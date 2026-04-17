@@ -5,6 +5,12 @@ import chalk from 'chalk';
 import { CLAUDE_DIR, CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, CLAUDE_MD, CONFIG_FILE, getExternalRepoPath, getAgentsSource } from '../lib/paths.js';
 import { isSymlink, getSymlinkTarget } from '../lib/symlinks.js';
 import { banner, success, warn, error, heading } from '../lib/format.js';
+import {
+  validateAgentFrontmatter,
+  validateSkillFrontmatter,
+  hasErrors,
+  hasWarnings,
+} from '../lib/validate-frontmatter.js';
 
 export function doctor(): void {
   banner();
@@ -129,6 +135,95 @@ export function doctor(): void {
     success(`Fonte de agentes: ${chalk.dim(agentsSource)}`);
   } else {
     warn('Nenhuma fonte de agentes encontrada');
+  }
+
+  const MAX_WARNINGS_SHOWN = 3;
+
+  // 8. Frontmatter validation (agents)
+  if (existsSync(CLAUDE_AGENTS_DIR)) {
+    const agents = readdirSync(CLAUDE_AGENTS_DIR).filter((f) => f.endsWith('.md'));
+    let errorCount = 0;
+    let warnCount = 0;
+    let warnsShown = 0;
+
+    for (const agent of agents) {
+      const agentPath = join(CLAUDE_AGENTS_DIR, agent);
+      const realPath = isSymlink(agentPath) ? getSymlinkTarget(agentPath) : agentPath;
+      if (!realPath || !existsSync(realPath)) continue;
+
+      try {
+        const result = validateAgentFrontmatter(realPath);
+        if (hasErrors(result)) {
+          errorCount++;
+          const errs = result.issues.filter((i) => i.severity === 'error');
+          error(`Agente ${result.name || agent}: ${errs.map((i) => i.message).join('; ')}`);
+          issues++;
+        } else if (hasWarnings(result)) {
+          warnCount++;
+          if (warnsShown < MAX_WARNINGS_SHOWN) {
+            const warns = result.issues.filter((i) => i.severity === 'warn');
+            warn(`Agente ${result.name}: ${warns.map((i) => i.message).join('; ')}`);
+            warnsShown++;
+          }
+        }
+      } catch (err) {
+        error(`Agente ${agent}: falha ao parsear frontmatter (${err instanceof Error ? err.message : String(err)})`);
+        issues++;
+      }
+    }
+
+    if (errorCount === 0 && warnCount === 0) {
+      success('Frontmatter de todos os agentes OK');
+    } else if (errorCount === 0) {
+      if (warnCount > MAX_WARNINGS_SHOWN) {
+        console.log(chalk.dim(`    ... e mais ${warnCount - MAX_WARNINGS_SHOWN} agente(s) com avisos`));
+      }
+      warn(`${warnCount} agente(s) com avisos de frontmatter (não bloqueia, mas revise)`);
+    }
+  }
+
+  // 9. Frontmatter validation (skills)
+  if (existsSync(CLAUDE_SKILLS_DIR)) {
+    const skills = readdirSync(CLAUDE_SKILLS_DIR, { withFileTypes: true }).filter(
+      (d) => d.isDirectory() || d.isSymbolicLink(),
+    );
+    let errorCount = 0;
+    let warnCount = 0;
+    let warnsShown = 0;
+
+    for (const skill of skills) {
+      const skillMd = join(CLAUDE_SKILLS_DIR, skill.name, 'SKILL.md');
+      if (!existsSync(skillMd)) continue;
+
+      try {
+        const result = validateSkillFrontmatter(skillMd);
+        if (hasErrors(result)) {
+          errorCount++;
+          const errs = result.issues.filter((i) => i.severity === 'error');
+          error(`Skill /${result.name || skill.name}: ${errs.map((i) => i.message).join('; ')}`);
+          issues++;
+        } else if (hasWarnings(result)) {
+          warnCount++;
+          if (warnsShown < MAX_WARNINGS_SHOWN) {
+            const warns = result.issues.filter((i) => i.severity === 'warn');
+            warn(`Skill /${result.name}: ${warns.map((i) => i.message).join('; ')}`);
+            warnsShown++;
+          }
+        }
+      } catch (err) {
+        error(`Skill ${skill.name}: falha ao parsear frontmatter (${err instanceof Error ? err.message : String(err)})`);
+        issues++;
+      }
+    }
+
+    if (errorCount === 0 && warnCount === 0) {
+      success('Frontmatter de todas as skills OK');
+    } else if (errorCount === 0) {
+      if (warnCount > MAX_WARNINGS_SHOWN) {
+        console.log(chalk.dim(`    ... e mais ${warnCount - MAX_WARNINGS_SHOWN} skill(s) com avisos`));
+      }
+      warn(`${warnCount} skill(s) com avisos de frontmatter`);
+    }
   }
 
   // Summary

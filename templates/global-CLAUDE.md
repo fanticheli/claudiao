@@ -86,13 +86,61 @@ Quando identificar uma tarefa complexa e recorrente que exija conhecimento espec
 | `test-specialist` | Estratégia de testes, TDD, cobertura, qualidade de testes |
 | `uxui-specialist` | UX/UI, design system, acessibilidade, CSS/Tailwind |
 
-## 7. Workflow
+## 7. Gatilhos de Skills (quando invocar automaticamente)
+
+Agentes e skills não se auto-ativam por contexto — **é sua responsabilidade**
+invocar a skill certa no momento certo. Use estes gatilhos como checklist:
+
+| Momento | Skill/Agente | Motivo |
+|---|---|---|
+| Finalizei endpoint ou handler | `/security-checklist` | Garante input validation, auth, rate limit |
+| Finalizei componente/tela | `/ui-review-checklist` | Acessibilidade, estados, responsividade |
+| Vou escrever migration | `/sql-templates` | Expand-contract, NOT VALID/VALIDATE |
+| Vou revisar/abrir PR | `/pr-template` + `pr-reviewer` | Descrição padrão + checklist de qualidade |
+| Recebi resumo de reunião | `/meet-dod` | Vira DoD estruturada |
+| Decisão técnica não-óbvia | `/architecture-decision` | ADR registra contexto + alternativas |
+| Priorizar 2+ features | `/product-templates` (RICE) | Evita priorização por bias |
+| Novo módulo Python | `/python-patterns` | Repository, Settings, FastAPI setup |
+
+## 8. Combos de Agentes (multi-domínio)
+
+Problemas complexos quase sempre envolvem múltiplas áreas. Use combos:
+
+| Cenário | Agentes a invocar (em paralelo) | Quem sintetiza |
+|---|---|---|
+| FastAPI + RDS + AWS infra | `python-specialist` + `aws-specialist` + `database-specialist` | você (ou `architect` se trade-offs conflitantes) |
+| Frontend com state complexo + design system | `react-specialist` + `uxui-specialist` | você |
+| Feature nova de ponta a ponta | `architect` → stack specialist → `test-specialist` → `security-specialist` → `pr-reviewer` | sequencial, não paralelo |
+| Incidente em produção | `database-specialist` (se query) OU stack specialist + `security-specialist` | você, com base nos sintomas |
+| Refactor grande | `architect` (decisão) + `implementation-planner` (tasks) + stack specialist | sequencial |
+
+**Regra:** se 2 agentes der recomendações conflitantes, invoque `architect`
+pra mediar com trade-offs explícitos.
+
+## 9. Delegação vs Resposta Direta
+
+Nem toda pergunta precisa de subagent. Decida pelo custo-benefício:
+
+**Delegue pra subagent quando:**
+- Task exige expertise profunda numa área específica
+- Você quer output isolado, sem poluir contexto principal
+- Há múltiplas áreas paralelas (use agents em paralelo)
+- Resposta vai além de 400 palavras de conhecimento especializado
+
+**Responda direto quando:**
+- Pergunta é genérica ou de preferência ("TypeScript ou JavaScript?")
+- Você tem o conhecimento e o contexto cabe em 1-2 parágrafos
+- Task é orquestração (decidir qual agent usar, resumir múltiplos outputs)
+- Usuário explicitamente quer resposta rápida
+
+## 10. Workflow
 
 - SEMPRE leia o CLAUDE.md do projeto antes de codar (se existir em `.claude/`)
 - SEMPRE siga os padrões JÁ existentes no projeto — não invente novos
-- ANTES de sugerir branch/commit, consulte o histórico do projeto com git log e git branch
+- ANTES de sugerir branch/commit, consulte o histórico do projeto com `git log` e `git branch`
+- ANTES de declarar "pronto" feature não-trivial, passe por `/security-checklist` (se backend) ou `/ui-review-checklist` (se frontend)
 
-## 8. Protocolo de Sessão
+## 11. Protocolo de Sessão
 
 Ao iniciar uma sessão de trabalho:
 1. **Confirme o projeto** — se não estiver óbvio pelo diretório, pergunte

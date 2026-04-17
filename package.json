@@ -1,6 +1,6 @@
 {
   "name": "claudiao",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Seu Claude Code no próximo nível. Agentes, skills e plugins em um comando.",
   "type": "module",
   "bin": {
@@ -42,6 +42,6 @@
     "@types/node": "^22.15.0",
     "tsx": "^4.19.0",
     "typescript": "^5.8.0",
-    "vitest": "^4.1.0"
+    "vitest": "^3.2.4"
   }
 }
