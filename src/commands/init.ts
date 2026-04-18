@@ -8,6 +8,7 @@ import {
 } from '../lib/paths.js';
 import { createSymlink, ensureDir } from '../lib/symlinks.js';
 import { parseAgentFile } from '../lib/frontmatter.js';
+import { getPackageVersion } from '../lib/package-info.js';
 import { banner, success, warn, error, info, dim, heading, separator } from '../lib/format.js';
 import { PLUGINS } from '../lib/plugins.js';
 import { execSync } from 'node:child_process';
@@ -234,7 +235,7 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
     const config = {
       repoPath: getExternalRepoPath() || existingConfig.repoPath || undefined,
       installedAt: new Date().toISOString(),
-      version: existingConfig.version || '1.0.0',
+      version: getPackageVersion(),
     };
     writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
   }

@@ -1,9 +1,6 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
 import { init } from './commands/init.js';
 import { createAgent, createSkill } from './commands/create.js';
 import { listAgents, listSkills, listPlugins } from './commands/list.js';
@@ -12,17 +9,14 @@ import { removeAgent, removeSkill } from './commands/remove.js';
 import { update } from './commands/update.js';
 import { installPlugin } from './commands/install-plugin.js';
 import { installHooks, uninstallHooks, listHooks } from './commands/hooks.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'));
+import { getPackageVersion } from './lib/package-info.js';
 
 const program = new Command();
 
 program
   .name('claudiao')
   .description('Seu Claude Code no próximo nível. Agentes, skills e plugins em um comando.')
-  .version(pkg.version);
+  .version(getPackageVersion());
 
 // ============================================================
 // init

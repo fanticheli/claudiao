@@ -1,9 +1,10 @@
 import { execSync } from 'node:child_process';
-import { existsSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import chalk from 'chalk';
-import { getExternalRepoPath, getAgentsSource, getSkillsSource, CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR } from '../lib/paths.js';
+import { getExternalRepoPath, getAgentsSource, getSkillsSource, CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, CONFIG_FILE } from '../lib/paths.js';
 import { createSymlink, ensureDir, isSymlink, getSymlinkTarget } from '../lib/symlinks.js';
+import { getPackageVersion } from '../lib/package-info.js';
 import { banner, success, warn, error, heading, info } from '../lib/format.js';
 
 export function update(options?: { force?: boolean; dryRun?: boolean }): void {
@@ -141,6 +142,22 @@ export function update(options?: { force?: boolean; dryRun?: boolean }): void {
 
   if (orphans === 0) {
     info('Nenhum symlink orfao');
+  }
+
+  // Sync version in config file (fixes BUG-001: version was hardcoded)
+  if (!dryRun && existsSync(CONFIG_FILE)) {
+    try {
+      const existing = JSON.parse(readFileSync(CONFIG_FILE, 'utf-8')) as Record<string, unknown>;
+      const currentVersion = getPackageVersion();
+      if (existing.version !== currentVersion) {
+        existing.version = currentVersion;
+        writeFileSync(CONFIG_FILE, JSON.stringify(existing, null, 2));
+      }
+    } catch {
+      // ignore corrupt config
+    }
+  } else if (dryRun) {
+    info(`[dry-run] Sincronizaria version em .claudiao.json com ${getPackageVersion()}`);
   }
 
   console.log('');
