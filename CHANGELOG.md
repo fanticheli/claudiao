@@ -9,16 +9,23 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [1.2.0] — unreleased
 
+### Added
+
+- `claudiao list agents` e `list skills` agora mostram coluna `[core|external|local]` que identifica onde o arquivo está (pacote bundled, repo externo configurado via `repoPath`, ou criado manualmente pelo usuário).
+- Helper `getInstallSource` em `src/lib/symlinks.ts` resolve a origem de um symlink comparando o target com o `PACKAGE_ROOT`.
+
+### Changed
+
+- **Hooks bundled reescritos em Node.js** (`.mjs`). Os 4 reminders (`security`, `ui`, `migration`, `commit`) agora funcionam em Linux, macOS e Windows nativo sem depender de bash, grep ou sed. Resolve FEAT-028 do backlog. `claudiao hooks install` migra entradas `.sh` legadas do `~/.claude/settings.json` automaticamente e remove scripts `.sh` órfãos de `~/.claude/hooks/`.
+- `claudiao update` agora atualiza o campo `version` no `.claudiao.json` a cada execução, refletindo o pacote instalado.
+- `claudiao doctor`, `update`, `init` e `create` compartilham a mesma lógica de validação de frontmatter via `src/lib/validate-frontmatter.ts`.
+
 ### Fixed
 
 - **BUG-001**: `.claudiao.json` agora grava a versão real do pacote lida de `package.json` em vez do fallback hardcoded `"1.0.0"`. `claudiao update` sincroniza o campo a cada execução.
 - **BUG-002**: symlinks criados em `~/.claude/` agora usam paths relativos em vez de absolutos, sobrevivendo a mudanças de `nvm`/`volta`, renomeação do diretório de instalação ou migração entre máquinas. Em Windows (junctions), paths absolutos são mantidos por restrição do SO.
 - **DEBT-004**: validação de frontmatter agora roda no `init`, `update` e `create` — agents/skills com frontmatter inválido são reportados com `✗` e pulados em vez de instalados silenciosamente. Warnings (description curta, sem gatilho explícito) continuam instalando mas aparecem no output.
-
-### Changed
-
-- `claudiao update` agora atualiza o campo `version` no `.claudiao.json` a cada execução, refletindo o pacote instalado.
-- `claudiao doctor`, `update`, `init` e `create` compartilham a mesma lógica de validação de frontmatter via `src/lib/validate-frontmatter.ts`.
+- **DEBT-007**: hooks bundled agora têm testes de integração que fazem `spawnSync` dos scripts reais com payload JSON via stdin (15 testes cobrindo match positivo, match negativo, filenames com caracteres especiais e JSON malformado).
 
 ## [1.1.0] — 2026-04-17
 
