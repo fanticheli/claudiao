@@ -1,5 +1,5 @@
-import { existsSync, lstatSync, mkdirSync, readlinkSync, realpathSync, rmSync, symlinkSync, renameSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { existsSync, lstatSync, mkdirSync, readlinkSync, rmSync, symlinkSync, renameSync } from 'node:fs';
+import { dirname, isAbsolute, relative, resolve } from 'node:path';
 
 export function ensureDir(dir: string): void {
   if (!existsSync(dir)) {
@@ -23,33 +23,58 @@ export function getSymlinkTarget(path: string): string | null {
   }
 }
 
+/**
+ * Builds the link path stored in the symlink. On POSIX we use a path
+ * relative to the symlink location so installs survive node_modules
+ * relocations (BUG-002). On Windows, absolute paths are required for
+ * junctions and more reliable for file symlinks.
+ */
+function buildLinkPath(source: string, target: string): string {
+  if (process.platform === 'win32') {
+    return resolve(source);
+  }
+  return relative(dirname(target), resolve(source));
+}
+
 export interface LinkResult {
   status: 'created' | 'updated' | 'skipped' | 'backup';
 }
 
 export function createSymlink(source: string, target: string): LinkResult {
   ensureDir(dirname(target));
+  const linkPath = buildLinkPath(source, target);
 
   if (isSymlink(target)) {
     const currentTarget = getSymlinkTarget(target);
     // Resolve both to absolute paths to handle relative symlinks
-    const resolvedCurrent = currentTarget ? resolve(dirname(target), currentTarget) : null;
+    const resolvedCurrent = currentTarget
+      ? isAbsolute(currentTarget)
+        ? currentTarget
+        : resolve(dirname(target), currentTarget)
+      : null;
     const resolvedSource = resolve(source);
     if (resolvedCurrent === resolvedSource) {
+      // Already points to the right place, but may still be absolute
+      // (legacy from v1.1 and earlier). Rewrite as relative for portability.
+      if (process.platform !== 'win32' && currentTarget && isAbsolute(currentTarget)) {
+        rmSync(target);
+        symlinkSync(linkPath, target);
+        return { status: 'updated' };
+      }
       return { status: 'skipped' };
     }
     rmSync(target);
-    symlinkSync(source, target);
+    symlinkSync(linkPath, target);
     return { status: 'updated' };
   }
 
   if (existsSync(target)) {
     renameSync(target, target + '.bak');
-    symlinkSync(source, target);
+    symlinkSync(linkPath, target);
     return { status: 'backup' };
   }
 
-  symlinkSync(source, target);
+  symlinkSync(linkPath, target);
   return { status: 'created' };
 }
 
