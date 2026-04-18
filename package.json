@@ -1,6 +1,6 @@
 {
   "name": "claudiao",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Seu Claude Code no próximo nível. Agentes, skills e plugins em um comando.",
   "type": "module",
   "bin": {

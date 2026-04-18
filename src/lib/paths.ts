@@ -16,7 +16,7 @@ function findPackageRoot(): string {
   return resolve(__dirname, '..', '..');
 }
 
-const PACKAGE_ROOT = findPackageRoot();
+export const PACKAGE_ROOT = findPackageRoot();
 
 export const CLAUDE_DIR = join(homedir(), '.claude');
 export const CLAUDE_AGENTS_DIR = join(CLAUDE_DIR, 'agents');

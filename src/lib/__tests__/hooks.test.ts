@@ -26,14 +26,14 @@ beforeEach(() => {
   mkdirSync(CLAUDE_DIR_OVERRIDE, { recursive: true });
   mkdirSync(join(TEMPLATES_DIR, 'hooks'), { recursive: true });
 
-  // Write fake hook scripts
+  // Write fake hook scripts (new .mjs format shipped in 1.2+)
   for (const name of [
-    'claudiao-security-reminder.sh',
-    'claudiao-ui-reminder.sh',
-    'claudiao-migration-reminder.sh',
-    'claudiao-commit-reminder.sh',
+    'claudiao-security-reminder.mjs',
+    'claudiao-ui-reminder.mjs',
+    'claudiao-migration-reminder.mjs',
+    'claudiao-commit-reminder.mjs',
   ]) {
-    writeFileSync(join(TEMPLATES_DIR, 'hooks', name), '#!/usr/bin/env bash\nexit 0\n');
+    writeFileSync(join(TEMPLATES_DIR, 'hooks', name), '#!/usr/bin/env node\nprocess.exit(0)\n');
   }
 });
 
@@ -47,9 +47,11 @@ afterEach(() => {
 describe('isClaudiaoHook', () => {
   it('identifies claudiao hooks by filename pattern', async () => {
     const { isClaudiaoHook } = await importHooks();
+    expect(isClaudiaoHook('/home/x/.claude/hooks/claudiao-security-reminder.mjs')).toBe(true);
+    // legacy .sh still recognized so uninstall can clean up pre-1.2 entries
     expect(isClaudiaoHook('/home/x/.claude/hooks/claudiao-security-reminder.sh')).toBe(true);
     expect(isClaudiaoHook('/home/x/.claude/hooks/gsd-context-monitor.js')).toBe(false);
-    expect(isClaudiaoHook('node /other/claudiao-thing.js')).toBe(false); // must end with .sh
+    expect(isClaudiaoHook('node /other/claudiao-thing.js')).toBe(false);
   });
 });
 
@@ -68,7 +70,39 @@ describe('mergeHooksIntoSettings', () => {
     const saved = readSettings();
     expect(saved.hooks?.PreToolUse).toBeDefined();
     expect(saved.hooks!.PreToolUse![0].matcher).toBe('Write|Edit');
-    expect(saved.hooks!.PreToolUse![0].hooks[0].command).toContain('claudiao-security-reminder.sh');
+    expect(saved.hooks!.PreToolUse![0].hooks[0].command).toContain('claudiao-security-reminder.mjs');
+  });
+
+  it('migrates legacy .sh entries to .mjs on merge (no duplication)', async () => {
+    const paths = await import('../paths.js');
+    // @ts-expect-error test override
+    paths.CLAUDE_DIR = CLAUDE_DIR_OVERRIDE;
+
+    // Simulate settings from a pre-1.2 install
+    const initial = {
+      hooks: {
+        PreToolUse: [
+          {
+            matcher: 'Write|Edit',
+            hooks: [
+              { type: 'command', command: join(CLAUDE_DIR_OVERRIDE, 'hooks', 'claudiao-security-reminder.sh'), timeout: 5 },
+            ],
+          },
+        ],
+      },
+    };
+    writeFileSync(join(CLAUDE_DIR_OVERRIDE, 'settings.json'), JSON.stringify(initial, null, 2));
+
+    const { HOOK_CATEGORIES, mergeHooksIntoSettings, writeSettings, readSettings } = await importHooks();
+    const security = HOOK_CATEGORIES.find((c) => c.id === 'security')!;
+
+    writeSettings(mergeHooksIntoSettings([security]));
+
+    const saved = readSettings();
+    const all = saved.hooks!.PreToolUse!.flatMap((m) => m.hooks);
+    expect(all).toHaveLength(1);
+    expect(all[0].command).toContain('.mjs');
+    expect(all[0].command).not.toContain('.sh');
   });
 
   it('preserves existing non-claudiao hooks when merging', async () => {

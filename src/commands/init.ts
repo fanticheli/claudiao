@@ -8,12 +8,20 @@ import {
 } from '../lib/paths.js';
 import { createSymlink, ensureDir } from '../lib/symlinks.js';
 import { parseAgentFile } from '../lib/frontmatter.js';
+import { getPackageVersion } from '../lib/package-info.js';
+import {
+  validateAgentFrontmatter,
+  validateSkillFrontmatter,
+  hasErrors,
+  hasWarnings,
+} from '../lib/validate-frontmatter.js';
 import { banner, success, warn, error, info, dim, heading, separator } from '../lib/format.js';
 import { PLUGINS } from '../lib/plugins.js';
 import { execSync } from 'node:child_process';
 
 export async function init(options?: { dryRun?: boolean }): Promise<void> {
   const dryRun = options?.dryRun ?? false;
+  let invalidCount = 0;
   banner();
 
   if (dryRun) {
@@ -99,17 +107,32 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
     } else {
       let installed = 0;
       let skipped = 0;
+      let invalid = 0;
 
       for (const file of agentFiles) {
         const source = join(agentsSource, file);
         const target = join(CLAUDE_AGENTS_DIR, file);
+
+        const validation = validateAgentFrontmatter(source);
+        if (hasErrors(validation)) {
+          const errs = validation.issues.filter((i) => i.severity === 'error');
+          error(`${file}: ${errs.map((i) => i.message).join('; ')}`);
+          invalid++;
+          invalidCount++;
+          continue;
+        }
 
         try {
           const meta = parseAgentFile(source);
           const result = createSymlink(source, target);
 
           if (result.status === 'created' || result.status === 'backup') {
-            success(`${meta.name} ${chalk.dim('— ' + meta.description.slice(0, 60))}`);
+            if (hasWarnings(validation)) {
+              const warns = validation.issues.filter((i) => i.severity === 'warn');
+              warn(`${meta.name} instalado com avisos: ${warns.map((i) => i.message).join('; ')}`);
+            } else {
+              success(`${meta.name} ${chalk.dim('— ' + meta.description.slice(0, 60))}`);
+            }
             installed++;
           } else {
             console.log(`  ${chalk.yellow('⏭')} ${meta.name} ${chalk.dim('— ja instalado')}`);
@@ -123,7 +146,12 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
       }
 
       console.log('');
-      info(`${chalk.green(String(installed) + ' novos')} | ${chalk.dim(String(skipped) + ' ja existiam')}`);
+      const parts = [
+        `${chalk.green(String(installed) + ' novos')}`,
+        `${chalk.dim(String(skipped) + ' ja existiam')}`,
+      ];
+      if (invalid > 0) parts.push(chalk.red(`${invalid} ignorados (frontmatter invalido)`));
+      info(parts.join(' | '));
     }
   } else {
     warn('Nenhum agente encontrado. Use `claudiao create agent` pra criar.');
@@ -153,12 +181,29 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
     } else {
       let installed = 0;
       let skipped = 0;
+      let invalid = 0;
 
       for (const dir of skillDirs) {
         const source = join(skillsSource, dir);
         const target = join(CLAUDE_SKILLS_DIR, dir);
-        const result = createSymlink(source, target);
+        const skillMd = join(source, 'SKILL.md');
 
+        if (existsSync(skillMd)) {
+          const validation = validateSkillFrontmatter(skillMd);
+          if (hasErrors(validation)) {
+            const errs = validation.issues.filter((i) => i.severity === 'error');
+            error(`/${dir}: ${errs.map((i) => i.message).join('; ')}`);
+            invalid++;
+            invalidCount++;
+            continue;
+          }
+          if (hasWarnings(validation)) {
+            const warns = validation.issues.filter((i) => i.severity === 'warn');
+            warn(`/${dir} com avisos: ${warns.map((i) => i.message).join('; ')}`);
+          }
+        }
+
+        const result = createSymlink(source, target);
         if (result.status === 'created' || result.status === 'backup') {
           success(`/${dir}`);
           installed++;
@@ -169,7 +214,12 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
       }
 
       console.log('');
-      info(`${chalk.green(String(installed) + ' novas')} | ${chalk.dim(String(skipped) + ' ja existiam')}`);
+      const parts = [
+        `${chalk.green(String(installed) + ' novas')}`,
+        `${chalk.dim(String(skipped) + ' ja existiam')}`,
+      ];
+      if (invalid > 0) parts.push(chalk.red(`${invalid} ignoradas (frontmatter invalido)`));
+      info(parts.join(' | '));
     }
   } else {
     warn('Nenhuma skill encontrada. Use `claudiao create skill` pra criar.');
@@ -234,7 +284,7 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
     const config = {
       repoPath: getExternalRepoPath() || existingConfig.repoPath || undefined,
       installedAt: new Date().toISOString(),
-      version: existingConfig.version || '1.0.0',
+      version: getPackageVersion(),
     };
     writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
   }
@@ -261,4 +311,9 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
   console.log(`  ${chalk.yellow('claudiao create agent')}    Cria um novo agente`);
   console.log(`  ${chalk.yellow('claudiao doctor')}          Verifica se tudo esta ok`);
   console.log('');
+
+  if (invalidCount > 0) {
+    warn(`${invalidCount} item(s) nao foram instalados por frontmatter invalido. Rode ${chalk.yellow('claudiao doctor')} pra detalhes.`);
+    process.exitCode = 1;
+  }
 }
