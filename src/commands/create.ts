@@ -6,7 +6,13 @@ import slugify from '@sindresorhus/slugify';
 import { CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, getAgentsSavePath, getSkillsSavePath } from '../lib/paths.js';
 import { createSymlink, ensureDir } from '../lib/symlinks.js';
 import { renderAgentTemplate, renderSkillTemplate, DEFAULT_AGENT_TOOLS, DEFAULT_SKILL_TOOLS } from '../lib/templates.js';
-import { banner, success, error, heading, info } from '../lib/format.js';
+import {
+  validateAgentFrontmatter,
+  validateSkillFrontmatter,
+  hasErrors,
+  hasWarnings,
+} from '../lib/validate-frontmatter.js';
+import { banner, success, error, warn, heading, info } from '../lib/format.js';
 
 export async function createAgent(description?: string): Promise<void> {
   banner();
@@ -156,6 +162,19 @@ export async function createAgent(description?: string): Promise<void> {
   writeFileSync(agentFilePath, agentContent);
   success(`Agente salvo em ${chalk.dim(agentFilePath)}`);
 
+  const validation = validateAgentFrontmatter(agentFilePath);
+  if (hasErrors(validation)) {
+    const errs = validation.issues.filter((i) => i.severity === 'error');
+    error(`Frontmatter invalido: ${errs.map((i) => i.message).join('; ')}`);
+    error('Arquivo salvo mas nao foi linkado. Corrija o frontmatter e rode `claudiao update`.');
+    process.exitCode = 1;
+    return;
+  }
+  if (hasWarnings(validation)) {
+    const warns = validation.issues.filter((i) => i.severity === 'warn');
+    warn(`Avisos de frontmatter: ${warns.map((i) => i.message).join('; ')}`);
+  }
+
   // Create symlink
   ensureDir(CLAUDE_AGENTS_DIR);
   const target = join(CLAUDE_AGENTS_DIR, `${answers.name}.md`);
@@ -264,6 +283,19 @@ export async function createSkill(description?: string): Promise<void> {
 
   writeFileSync(skillFilePath, skillContent);
   success(`Skill salva em ${chalk.dim(skillFilePath)}`);
+
+  const validation = validateSkillFrontmatter(skillFilePath);
+  if (hasErrors(validation)) {
+    const errs = validation.issues.filter((i) => i.severity === 'error');
+    error(`Frontmatter invalido: ${errs.map((i) => i.message).join('; ')}`);
+    error('Arquivo salvo mas nao foi linkado. Corrija o frontmatter e rode `claudiao update`.');
+    process.exitCode = 1;
+    return;
+  }
+  if (hasWarnings(validation)) {
+    const warns = validation.issues.filter((i) => i.severity === 'warn');
+    warn(`Avisos de frontmatter: ${warns.map((i) => i.message).join('; ')}`);
+  }
 
   // Create symlink
   ensureDir(CLAUDE_SKILLS_DIR);
