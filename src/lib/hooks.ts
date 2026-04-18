@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, chmodSync, copyFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync, chmodSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CLAUDE_DIR, getTemplatesPath } from './paths.js';
 import { ensureDir } from './symlinks.js';
@@ -20,7 +20,7 @@ export const HOOK_CATEGORIES: HookCategory[] = [
     id: 'security',
     name: 'Security reminder',
     description: 'Lembra /security-checklist ao editar endpoints, routes, auth',
-    script: 'claudiao-security-reminder.sh',
+    script: 'claudiao-security-reminder.mjs',
     matcher: 'Write|Edit',
     event: 'PreToolUse',
   },
@@ -28,7 +28,7 @@ export const HOOK_CATEGORIES: HookCategory[] = [
     id: 'ui',
     name: 'UI review reminder',
     description: 'Lembra /ui-review-checklist ao editar componentes de UI',
-    script: 'claudiao-ui-reminder.sh',
+    script: 'claudiao-ui-reminder.mjs',
     matcher: 'Write|Edit',
     event: 'PreToolUse',
   },
@@ -36,7 +36,7 @@ export const HOOK_CATEGORIES: HookCategory[] = [
     id: 'migration',
     name: 'Migration reminder',
     description: 'Lembra patterns zero-downtime ao criar migrations SQL',
-    script: 'claudiao-migration-reminder.sh',
+    script: 'claudiao-migration-reminder.mjs',
     matcher: 'Write',
     event: 'PreToolUse',
   },
@@ -44,11 +44,13 @@ export const HOOK_CATEGORIES: HookCategory[] = [
     id: 'commit',
     name: 'Conventional commit reminder',
     description: 'Valida formato conventional commits ao rodar git commit',
-    script: 'claudiao-commit-reminder.sh',
+    script: 'claudiao-commit-reminder.mjs',
     matcher: 'Bash',
     event: 'PreToolUse',
   },
 ];
+
+const LEGACY_SCRIPT_EXT = '.sh';
 
 interface HookEntry {
   type: 'command';
@@ -67,7 +69,24 @@ interface SettingsJson {
 }
 
 export function isClaudiaoHook(command: string): boolean {
-  return command.includes('claudiao-') && command.endsWith('.sh');
+  return command.includes('claudiao-') && (command.endsWith('.mjs') || command.endsWith(LEGACY_SCRIPT_EXT));
+}
+
+/**
+ * Maps a (possibly legacy .sh) script name back to its HookCategory, so
+ * install/uninstall can migrate entries from earlier versions. Returns
+ * null if the script is not one of the known categories.
+ */
+export function findCategoryByScript(scriptPath: string): HookCategory | null {
+  return (
+    HOOK_CATEGORIES.find((c) => {
+      const base = c.script.replace(/\.mjs$/, '');
+      return (
+        scriptPath.endsWith(c.script) ||
+        scriptPath.endsWith(`${base}.sh`)
+      );
+    }) ?? null
+  );
 }
 
 export function readSettings(): SettingsJson {
@@ -85,7 +104,9 @@ export function writeSettings(settings: SettingsJson): void {
 }
 
 /**
- * Copies hook scripts from templates/ to ~/.claude/hooks/ and makes them executable.
+ * Copies hook scripts from templates/ to ~/.claude/hooks/ and makes them
+ * executable. Removes legacy .sh variants for the same category so users
+ * upgrading from pre-1.2 don't keep stale shell scripts lying around.
  */
 export function copyHookScripts(categories: HookCategory[]): string[] {
   ensureDir(HOOKS_DIR);
@@ -99,42 +120,58 @@ export function copyHookScripts(categories: HookCategory[]): string[] {
     copyFileSync(src, dest);
     chmodSync(dest, 0o755);
     copied.push(dest);
+
+    const legacyDest = dest.replace(/\.mjs$/, LEGACY_SCRIPT_EXT);
+    if (legacyDest !== dest && existsSync(legacyDest)) {
+      rmSync(legacyDest);
+    }
   }
   return copied;
 }
 
 /**
  * Merges claudiao hook entries into existing settings.json. Safe to run
- * multiple times — dedupes by command path.
+ * multiple times — dedupes by command path and migrates any legacy .sh
+ * entries written by pre-1.2 versions of claudiao.
  */
 export function mergeHooksIntoSettings(categories: HookCategory[]): SettingsJson {
   const settings = readSettings();
   settings.hooks = settings.hooks ?? {};
 
+  const categoryScripts = new Set(
+    categories.flatMap((c) => [c.script, c.script.replace(/\.mjs$/, '.sh')]),
+  );
+
   for (const cat of categories) {
     const command = join(HOOKS_DIR, cat.script);
+    const list = (settings.hooks[cat.event] ?? []) as HookMatcher[];
+
+    // Drop any legacy claudiao entry for this category before re-adding.
+    // Legacy = .sh from pre-1.2 or the same script we're about to write.
+    const cleaned: HookMatcher[] = [];
+    for (const matcher of list) {
+      const kept = matcher.hooks.filter((h) => {
+        if (h.type !== 'command') return true;
+        if (!isClaudiaoHook(h.command)) return true;
+        // remove if it belongs to this category (any extension)
+        return !categoryScripts.has(h.command.split('/').pop() ?? '');
+      });
+      if (kept.length > 0) cleaned.push({ ...matcher, hooks: kept });
+    }
+
     const entry: HookMatcher = {
       matcher: cat.matcher,
       hooks: [{ type: 'command', command, timeout: 5 }],
     };
 
-    const list = (settings.hooks[cat.event] ?? []) as HookMatcher[];
-
-    // Se já existe um matcher deste mesmo tipo, merge os hooks
-    // Senão, adiciona nova entrada
-    const existing = list.find((m) => m.matcher === cat.matcher);
+    const existing = cleaned.find((m) => m.matcher === cat.matcher);
     if (existing) {
-      const alreadyHasClaudiao = existing.hooks.some(
-        (h) => h.type === 'command' && h.command === command,
-      );
-      if (!alreadyHasClaudiao) {
-        existing.hooks.push({ type: 'command', command, timeout: 5 });
-      }
+      existing.hooks.push({ type: 'command', command, timeout: 5 });
     } else {
-      list.push(entry);
+      cleaned.push(entry);
     }
 
-    settings.hooks[cat.event] = list;
+    settings.hooks[cat.event] = cleaned;
   }
 
   return settings;
@@ -160,8 +197,7 @@ export function removeClaudiaoHooks(): { removedCount: number; categoriesRemoved
       const kept = m.hooks.filter((h) => {
         if (h.type === 'command' && isClaudiaoHook(h.command)) {
           removedCount++;
-          // Infer category from script name
-          const cat = HOOK_CATEGORIES.find((c) => h.command.endsWith(c.script));
+          const cat = findCategoryByScript(h.command);
           if (cat) categoriesRemoved.add(cat.id);
           return false;
         }
@@ -202,7 +238,7 @@ export function listInstalledHooks(): Array<{ event: string; matcher: string; ca
     for (const m of list) {
       for (const h of m.hooks) {
         if (h.type === 'command' && isClaudiaoHook(h.command)) {
-          const cat = HOOK_CATEGORIES.find((c) => h.command.endsWith(c.script));
+          const cat = findCategoryByScript(h.command);
           result.push({
             event,
             matcher: m.matcher ?? '',
