@@ -1,9 +1,11 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, existsSync, readFileSync, lstatSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, existsSync, readFileSync, readlinkSync, renameSync, symlinkSync } from 'node:fs';
 import { rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { ensureDir, isSymlink, createSymlink, removeSymlink } from '../symlinks.js';
+import { ensureDir, isSymlink, createSymlink, getInstallSource, removeSymlink } from '../symlinks.js';
+
+const isPosix = process.platform !== 'win32';
 
 let tmpDir: string;
 
@@ -72,13 +74,17 @@ describe('createSymlink', () => {
     expect(readFileSync(target, 'utf-8')).toBe('# Agent');
   });
 
-  it('should skip if symlink already points to the same target (status: skipped)', () => {
+  it('should skip if relative symlink already points to the same target (status: skipped)', () => {
     const dir = makeTmp();
     const source = join(dir, 'source.md');
     const target = join(dir, 'link.md');
     writeFileSync(source, 'content');
-    symlinkSync(source, target);
 
+    // First call creates the symlink with the current (relative on POSIX) layout
+    const first = createSymlink(source, target);
+    expect(first.status).toBe('created');
+
+    // Second call to the same pair: already relative on POSIX, so skipped
     const result = createSymlink(source, target);
 
     expect(result.status).toBe('skipped');
@@ -127,6 +133,92 @@ describe('createSymlink', () => {
 
     expect(existsSync(join(dir, 'deep', 'nested'))).toBe(true);
     expect(isSymlink(target)).toBe(true);
+  });
+});
+
+describe('createSymlink — relative path (BUG-002)', () => {
+  it.skipIf(!isPosix)('writes a relative link target on POSIX', () => {
+    const dir = makeTmp();
+    const source = join(dir, 'source.md');
+    const target = join(dir, 'installed', 'agent.md');
+    writeFileSync(source, '# Agent');
+
+    createSymlink(source, target);
+
+    const stored = readlinkSync(target);
+    expect(isAbsolute(stored)).toBe(false);
+    expect(stored).toBe('../source.md');
+  });
+
+  it.skipIf(!isPosix)('survives renaming the containing parent directory', () => {
+    const dir = makeTmp();
+    const source = join(dir, 'bundled', 'agent.md');
+    const target = join(dir, 'installed', 'agent.md');
+    ensureDir(join(dir, 'bundled'));
+    writeFileSync(source, '# Agent body');
+
+    createSymlink(source, target);
+
+    // Rename the outer dir, simulating a move of the whole install root
+    const moved = dir + '-moved';
+    renameSync(dir, moved);
+
+    const movedTarget = join(moved, 'installed', 'agent.md');
+    expect(readFileSync(movedTarget, 'utf-8')).toBe('# Agent body');
+
+    // restore path so afterEach cleanup works
+    renameSync(moved, dir);
+  });
+
+  it.skipIf(!isPosix)('upgrades an existing absolute symlink to relative', () => {
+    const dir = makeTmp();
+    const source = join(dir, 'source.md');
+    const target = join(dir, 'installed', 'agent.md');
+    writeFileSync(source, 'x');
+    ensureDir(join(dir, 'installed'));
+    // Simulate legacy v1.1 absolute symlink
+    symlinkSync(source, target);
+    expect(isAbsolute(readlinkSync(target))).toBe(true);
+
+    const result = createSymlink(source, target);
+
+    expect(result.status).toBe('updated');
+    expect(isAbsolute(readlinkSync(target))).toBe(false);
+  });
+});
+
+describe('getInstallSource', () => {
+  it.skipIf(!isPosix)('returns "core" when link target is inside packageRoot', () => {
+    const dir = makeTmp();
+    const packageRoot = join(dir, 'package');
+    const source = join(packageRoot, 'templates', 'agents', 'a.md');
+    const target = join(dir, 'installed', 'a.md');
+    ensureDir(join(packageRoot, 'templates', 'agents'));
+    writeFileSync(source, 'x');
+    createSymlink(source, target);
+
+    expect(getInstallSource(target, packageRoot)).toBe('core');
+  });
+
+  it.skipIf(!isPosix)('returns "external" when target is outside packageRoot', () => {
+    const dir = makeTmp();
+    const packageRoot = join(dir, 'package');
+    ensureDir(packageRoot);
+    const source = join(dir, 'external-repo', 'a.md');
+    const target = join(dir, 'installed', 'a.md');
+    ensureDir(join(dir, 'external-repo'));
+    writeFileSync(source, 'x');
+    createSymlink(source, target);
+
+    expect(getInstallSource(target, packageRoot)).toBe('external');
+  });
+
+  it('returns "local" when path is a regular file', () => {
+    const dir = makeTmp();
+    const file = join(dir, 'regular.md');
+    writeFileSync(file, 'x');
+
+    expect(getInstallSource(file, dir)).toBe('local');
   });
 });
 

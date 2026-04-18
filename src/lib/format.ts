@@ -42,16 +42,25 @@ export function separator(): void {
   console.log('');
 }
 
-export function table(rows: Array<{ name: string; description: string; status?: string }>): void {
-  const maxName = Math.max(...rows.map(r => r.name.length), 4);
+export function table(
+  rows: Array<{ name: string; description: string; status?: string; source?: string }>,
+): void {
+  const maxName = Math.max(...rows.map((r) => r.name.length), 4);
+  const hasSource = rows.some((r) => r.source);
+  const maxSource = hasSource
+    ? Math.max(...rows.map((r) => (r.source ?? '').length), 6)
+    : 0;
 
   for (const row of rows) {
     const name = row.name.padEnd(maxName + 2);
+    const source = hasSource
+      ? chalk.dim(`[${(row.source ?? '').padEnd(maxSource)}] `)
+      : '';
     const status = row.status
       ? row.status === 'installed'
         ? chalk.green(' [instalado]')
         : chalk.dim(' [não instalado]')
       : '';
-    console.log(`  ${chalk.cyan(name)}${chalk.dim(row.description)}${status}`);
+    console.log(`  ${chalk.cyan(name)}${source}${chalk.dim(row.description)}${status}`);
   }
 }

@@ -5,19 +5,83 @@
 
 ---
 
-## P0 — Bugs e correções urgentes
+## ✅ Resolvido em 1.2.0
 
-### BUG-001: Version hardcoded no config
-**Onde:** `src/commands/init.ts:237`
-**Problema:** A versão salva em `.claudiao.json` usa fallback `'1.0.0'` hardcoded em vez de ler do `package.json` do claudião instalado.
-**Impacto:** Config sempre mostra `1.0.0` mesmo após atualização do pacote.
-**Solução:** Importar a versão do `package.json` (já feito no `index.ts` com `readFileSync`) e reutilizar.
+> Validados em sessão de 18/04/2026 e implementados na branch `feat/v1.2.0-bugs-bundles-hooks`. Commit range disponível via `git log v1.1.0..v1.2.0`.
 
-### BUG-002: Symlinks absolutos quebram ao mover instalação
-**Onde:** `src/lib/symlinks.ts:42-43`
-**Problema:** `symlinkSync(source, target)` cria symlinks com path absoluto. Se o user move o pacote ou muda o `nvm`/`volta`, todos os symlinks quebram.
-**Impacto:** Baixo (o `doctor` já detecta), mas causa confusão em quem usa version managers.
-**Solução:** Calcular path relativo com `path.relative()` antes de criar o symlink.
+- **BUG-001**: version sincronizada com `package.json` em `init` e `update` via helper `getPackageVersion` (`src/lib/package-info.ts`).
+- **BUG-002**: symlinks criados em POSIX agora usam path relativo; absolutos existentes são auto-migrados na próxima `update`. Windows mantém absoluto por exigência de junctions.
+- **DEBT-004**: `init`, `update` e `create` agora chamam `validateAgentFrontmatter`/`validateSkillFrontmatter` antes de linkar; erros pulam o item e retornam exit code 1.
+- **FEAT-025**: `CHANGELOG.md` (Keep a Changelog) adicionado com entradas retroativas para 1.0.0, 1.1.0 e 1.2.0.
+- **FEAT-028**: hooks bundled reescritos em Node.js (`.mjs`) — sem mais dependência de bash/grep/sed, cross-platform (Windows nativo, macOS, Linux). Migração automática de entradas `.sh` legadas em `settings.json` + cleanup dos arquivos `.sh` órfãos em `~/.claude/hooks/`.
+- **DEBT-007**: hooks agora têm testes de integração via `spawnSync` (15 testes em `hook-scripts.integration.test.ts`).
+- **Descoberta durante validação**: coluna `source` em `list agents/skills` (`[core|external|local]`) — distingue bundled, external repo e itens manuais.
+
+## ✅ Resolvido em 1.1.0
+
+- **FEAT-021**: sistema de hooks (`claudiao hooks install|uninstall|list`) implementado em `src/commands/hooks.ts` e `src/lib/hooks.ts` (commit `87da686`). Observação: os 4 scripts bundled são `.sh` hoje — rewrite cross-platform tracked em **FEAT-028** (Pré-1.2).
+- **FEAT-022**: validação de frontmatter em `claudiao doctor` implementada em `src/lib/validate-frontmatter.ts` (commit `87da686`). Wiring nos demais comandos (DEBT-004) completado em 1.2.0.
+
+---
+
+## Pré-1.2 — Profissionalização (blockers de adoção externa)
+
+> Diagnóstico de validação de abril/2026: código está sólido, conteúdo (agents/skills) está bom, **mas falta infraestrutura de projeto**. Sem os itens abaixo, a lib funciona como ferramenta pessoal mas não atinge adoção externa. Ordem sugerida: FEAT-023 → FEAT-025 → FEAT-026 → FEAT-027 → FEAT-024 → FEAT-028.
+
+### FEAT-023: CI/CD pipeline com GitHub Actions
+**Motivação:** Hoje não há CI. Qualquer PR externo é russa roleta, e você pode publicar release quebrada sem saber. É o item #1 pra qualquer contribuição externa.
+**Escopo:**
+- Workflow `.github/workflows/ci.yml` rodando em cada PR e push para main
+- Jobs: `typecheck`, `test`, `build`, `lint` (requer FEAT-002 antes)
+- Matrix de Node: 18, 20, 22
+- Matrix de OS: `ubuntu-latest`, `macos-latest`, `windows-latest` (pega regressão cross-platform)
+- Dependabot ou Renovate habilitado pra deps
+- Badge no README com status do CI
+**Estimativa:** 3-4h para setup básico; +2h pra matrix completa
+**Dependência:** FEAT-002 (lint) precisa estar pronto ou ser feito junto
+
+### FEAT-024: Release automation (changesets)
+**Motivação:** Hoje release é manual (`npm run build` + `npm publish` + `git tag` + `git push`). Fácil esquecer uma etapa e publicar dist vazio, tag dessincronizada, ou versão errada.
+**Escopo:**
+- Adotar [changesets](https://github.com/changesets/changesets) ou `release-please`
+- Workflow dispara release automático em push para main com changeset pendente
+- Gera `CHANGELOG.md` automaticamente (integra com FEAT-025)
+- Cria git tag + GitHub release + npm publish em um fluxo atômico
+- Gate: testes passando é pré-requisito
+- Documentação em CONTRIBUTING (FEAT-027) de como adicionar changeset em PRs
+**Estimativa:** 3-4h
+**Dependência:** FEAT-023 (CI) pronto
+
+### FEAT-025: CHANGELOG.md versionado — ✅ resolvido em 1.2.0
+_Concluído na branch `feat/v1.2.0-bugs-bundles-hooks`. Restante (automação via FEAT-024) ainda pendente._
+
+### FEAT-026: README visual com demo
+**Motivação:** README atual é só texto. Lib de CLI com 18 agents + 9 skills + hooks merece demonstração visual. Sem isso, usuário novo desiste antes de instalar.
+**Escopo:**
+- GIF/vídeo curto (≤30s) mostrando `claudiao init` completo
+- Gerado com [asciinema](https://asciinema.org) + [svg-term-cli](https://github.com/marionebl/svg-term-cli) (versão portável)
+- Seção "Antes/Depois": mesmo prompt com e sem claudiao instalado (print de Claude Code)
+- Badges no topo: npm version, downloads, CI status, license
+- Tabela clara de "O que vem instalado" com contagem
+- Quickstart em 3 comandos no topo (não perdido no meio do arquivo)
+- Link direto pra docs de cada agent/skill
+**Estimativa:** 3-4h (gravação + edição + markdown)
+
+### FEAT-027: Project health files
+**Motivação:** Sem esses arquivos, o repo parece abandonado e contribuidores não sabem como ajudar. São padrão OSS hoje.
+**Escopo:**
+- `LICENSE` — arquivo físico (MIT já declarado em package.json, mas falta arquivo)
+- `CONTRIBUTING.md` — fluxo de PR, como rodar testes, como adicionar changeset
+- `CODE_OF_CONDUCT.md` — Contributor Covenant 2.1 (copy-paste)
+- `SECURITY.md` — como reportar vulnerabilidades (email + responsabilidade)
+- `.github/ISSUE_TEMPLATE/bug_report.md`
+- `.github/ISSUE_TEMPLATE/feature_request.md`
+- `.github/ISSUE_TEMPLATE/new_agent_or_skill.md` (específico pra essa lib)
+- `.github/PULL_REQUEST_TEMPLATE.md` — dogfood o próprio `/pr-template`
+**Estimativa:** 2h pra tudo
+
+### FEAT-028: Hooks cross-platform (rewrite em Node.js) — ✅ resolvido em 1.2.0
+_Concluído. Scripts agora em `.mjs`, testes de integração com `spawnSync`, cleanup automático de `.sh` legados._
 
 ---
 
@@ -70,38 +134,7 @@
 - `claudiao list agents` mostra status (ativo/inativo)
 - Persistir estado no `.claudiao.json`
 
-### FEAT-021: Hooks do claudião (forçar skills em momentos críticos)
-**Descrição:** Instalar hooks em `~/.claude/settings.json` que lembram o user
-de invocar skills em momentos específicos — transformando skills de opt-in
-em opt-out.
-**Motivação:** Validação da lib mostrou que skills e agentes não auto-ativam
-por contexto. Nada força `/security-checklist` antes de PR, nem
-`/ui-review-checklist` após editar componente. Hooks resolvem sem exigir
-disciplina do user.
-**Escopo:**
-- `claudiao hooks install` → adiciona hooks em `~/.claude/settings.json` (merge, não overwrite)
-- `claudiao hooks uninstall` → remove apenas os hooks do claudião (identificados por comentário/marker)
-- `claudiao hooks list` → mostra quais hooks estão ativos
-- Templates de hook bundled em `templates/hooks/`:
-  - **`pre-write-endpoint.sh`**: ao editar arquivo em `routes/`, `controllers/`, `handlers/`, exibe lembrete "rodou /security-checklist?"
-  - **`pre-write-component.sh`**: ao editar `.tsx`/`.jsx`, lembra `/ui-review-checklist`
-  - **`pre-migration.sh`**: ao criar arquivo em `migrations/`, lembra `/sql-templates` (expand-contract)
-  - **`post-commit.sh`**: valida se conventional commit foi respeitado
-- Opt-in por tipo: `claudiao hooks install --only security,ui` (lista de categorias)
-- Documentar override: user pode editar `~/.claude/hooks/claudiao-*.sh` pra customizar
-**Dependências:** nenhuma — hooks do Claude Code já suportam matchers por tool name.
-
-### FEAT-022: Validação de frontmatter em `claudiao doctor`
-**Descrição:** O `doctor` hoje checa symlinks e paths, mas não valida se o
-frontmatter dos agents/skills está completo.
-**Motivação:** Agentes com frontmatter incompleto (falta `description` clara,
-falta `model`) funcionam, mas deixam triggers inconsistentes. Validação
-proativa evita falha silenciosa na ativação.
-**Escopo:**
-- `doctor` roda gray-matter em todo agent/skill instalado
-- Valida: `name`, `description` (>50 chars), `model`, `tools`/`allowed-tools`
-- Warn se descrição não tem trigger explícito ("when user says", "use when")
-- Flag `--fix` sugere correções
+_FEAT-021 e FEAT-022 foram concluídas em 1.1.0 — ver seção "✅ Resolvido" no topo._
 
 ---
 
@@ -169,6 +202,28 @@ proativa evita falha silenciosa na ativação.
 - `claudiao diff agent aws-specialist` → diff entre `~/.claude/agents/aws-specialist.md` e source
 - `claudiao diff --all` → lista todos os que divergem
 - Integrar com `update --force` para mostrar o que seria sobrescrito
+
+### FEAT-029: Landing page e docs site (GitHub Pages)
+**Motivação:** Hoje, quem busca "claude code brasil" ou "claude code templates" no Google encontra no máximo a página do npm, que é feia. Landing page aumenta discoverability por SEO.
+**Escopo:**
+- Site estático em `docs/` via Astro ou Next.js (export)
+- Deploy automático via GitHub Pages em push para main
+- Seções: hero + quickstart + agent/skill reference + contribute
+- Referência completa de cada agent e skill com exemplos de uso
+- Blog integrado para posts de use case
+- Analytics (Plausible ou Umami, privacy-friendly)
+- Custom domain opcional (claudiao.dev ou similar)
+**Estimativa:** fim de semana (12-16h)
+**Dependência:** FEAT-026 (conteúdo visual) pra reusar
+
+### FEAT-030: Modo `--verbose` e `CLAUDIAO_DEBUG`
+**Descrição:** Flag global pra output detalhado em debugging.
+**Motivação:** Hoje quando algo dá errado não há como ver detalhes (movido de DEBT-006 pra P2).
+**Escopo:**
+- Flag `--verbose` em todos os commands
+- Env var `CLAUDIAO_DEBUG=1` como alternativa
+- Logs detalhados: symlink source/target, resolução de paths, validação de frontmatter
+- Integra com `doctor` pra mostrar por que cada check passou/falhou
 
 ---
 
@@ -263,10 +318,8 @@ proativa evita falha silenciosa na ativação.
 **Problema:** Cada command reimplementa a lógica de dry-run com if/else. Muito boilerplate.
 **Solução:** Criar wrapper `dryRunnable(action, dryMessage)` ou middleware no Commander.
 
-### DEBT-004: Sem validação do frontmatter ao instalar
-**Onde:** `init.ts:107-122`, `update.ts:51-72`
-**Problema:** Se um agente tem frontmatter inválido, o `init` faz catch silencioso e instala mesmo assim. Pode instalar um .md quebrado.
-**Solução:** Validar campos obrigatórios (`name`, `description`) e emitir warning se faltar.
+### DEBT-004: Sem validação do frontmatter ao instalar — ✅ resolvido em 1.2.0
+_Concluído na branch `feat/v1.2.0-bugs-bundles-hooks`. Validação compartilhada via `src/lib/validate-frontmatter.ts` agora roda em `init`, `update` e `create`._
 
 ### DEBT-005: `install-plugin` sem validação de command injection
 **Onde:** `src/commands/install-plugin.ts` → `execSync(plugin.installCommand)`
@@ -277,6 +330,62 @@ proativa evita falha silenciosa na ativação.
 **Onde:** Global
 **Problema:** Quando algo dá errado, não tem como ver detalhes. O `doctor` ajuda, mas não cobre runtime.
 **Solução:** Flag `--verbose` ou env var `CLAUDIAO_DEBUG=1` que ativa logs detalhados em todos os commands.
+**Nota:** Escalado como FEAT-030 (promovido de debt para feature por impacto em adoção).
+
+### DEBT-007: Hook scripts sem testes de integração — ✅ resolvido em 1.2.0
+_Concluído junto com FEAT-028. Integration tests em `src/lib/__tests__/hook-scripts.integration.test.ts`._
+
+### DEBT-008: README desatualizado vs versão atual
+**Onde:** `README.md`
+**Problema:** README descreve funcionalidades da 1.0 mas não menciona hooks (1.1), validação de frontmatter no doctor (1.1), nem como usar os triggers de skill. Usuário que lê o README não sabe o que instalou.
+**Solução:** Atualizar README com seção "What's new in 1.1" e, preferencialmente, estrutura evergreen com link para CHANGELOG em vez de repetir conteúdo. Resolver junto com FEAT-026.
+
+---
+
+## Go-to-Market — Adoção e Comunidade
+
+> Não são features de produto, mas são pré-requisito pra lib sair do "uso pessoal" e virar adotada. Fazer só depois de FEAT-023 a FEAT-028 (infraestrutura) porque não adianta divulgar algo que ainda não suporta contribuição externa.
+
+### GTM-001: Lançamento público inicial
+**Motivação:** Claudião está em npm desde 1.0.0 mas sem anúncio formal. Sem divulgação, adoção fica em zero orgânico.
+**Escopo:**
+- Post de blog em pt-BR: "Como configurei meu Claude Code pra trabalhar no meu nível — apresentando claudião"
+- Post em inglês complementar: "A CLI to manage Claude Code agents and skills (Portuguese-first, English-compatible)"
+- Vídeo de 3-5min no YouTube mostrando instalação + uso real
+- Thread no Twitter/X/Bluesky com GIFs
+- Show HN (Hacker News) — considerar timing (manhã de terça, horário US)
+- Post no r/ClaudeAI e r/brdev no Reddit
+- Submissão para newsletters: Awesome Claude Code, Developer Tools Weekly
+**Estimativa:** 2-3 dias de trabalho concentrado
+**Dependência:** FEAT-026 (README visual), FEAT-029 (landing), FEAT-025 (CHANGELOG) prontos
+
+### GTM-002: Comunidade
+**Motivação:** Lib sobrevive por comunidade, não por autor solo. Precisa de canal de contato.
+**Escopo:**
+- Servidor Discord ou canal no Slack (escolha baseada em audiência — DevRel BR usa Discord mais)
+- GitHub Discussions habilitado no repo (alternativa low-overhead ao Discord)
+- Mailing list simples via Buttondown ou similar (opt-in pra release notes)
+- Office hours mensal (live no Twitch/YouTube respondendo dúvidas e mostrando uso)
+- Canal para submissão de agents/skills da comunidade (curadoria leve)
+**Estimativa:** 1 dia pra setup + overhead contínuo
+
+### GTM-003: Casos de uso reais (case studies)
+**Motivação:** Testimonial vago ("usei e gostei") não convence. Números convencem.
+**Escopo:**
+- 3 estudos de caso com devs usando claudião em seus projetos
+- Cada estudo: stack usada, quais agents/skills mais usados, métrica de ganho (tempo economizado, bugs evitados, PRs mais rápidos)
+- Formato: post de blog + entrada na landing page
+- Primeiro case study: você mesmo, usando em SpaceVis / DigAÍ / RouteEasy
+**Estimativa:** 4-6h por case study
+
+### GTM-004: Parcerias e menções
+**Motivação:** Tráfego vem de endosso, não de push de features.
+**Escopo:**
+- Reach out pra criadores de conteúdo BR que falam de Claude/IA (filipedeschamps, Fabio Akita, Rocketseat)
+- Submissão pra inclusão em listas "Awesome Claude Code", "Awesome DevTools"
+- Sponsorship ou palestra em eventos: TDC, DevRelCon, The Developer's Conference
+- Guest post em blogs técnicos relevantes
+**Estimativa:** contínuo, 2-4h por semana
 
 ---
 
