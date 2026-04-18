@@ -13,6 +13,9 @@
 - **BUG-002**: symlinks criados em POSIX agora usam path relativo; absolutos existentes são auto-migrados na próxima `update`. Windows mantém absoluto por exigência de junctions.
 - **DEBT-004**: `init`, `update` e `create` agora chamam `validateAgentFrontmatter`/`validateSkillFrontmatter` antes de linkar; erros pulam o item e retornam exit code 1.
 - **FEAT-025**: `CHANGELOG.md` (Keep a Changelog) adicionado com entradas retroativas para 1.0.0, 1.1.0 e 1.2.0.
+- **FEAT-028**: hooks bundled reescritos em Node.js (`.mjs`) — sem mais dependência de bash/grep/sed, cross-platform (Windows nativo, macOS, Linux). Migração automática de entradas `.sh` legadas em `settings.json` + cleanup dos arquivos `.sh` órfãos em `~/.claude/hooks/`.
+- **DEBT-007**: hooks agora têm testes de integração via `spawnSync` (15 testes em `hook-scripts.integration.test.ts`).
+- **Descoberta durante validação**: coluna `source` em `list agents/skills` (`[core|external|local]`) — distingue bundled, external repo e itens manuais.
 
 ## ✅ Resolvido em 1.1.0
 
@@ -77,17 +80,8 @@ _Concluído na branch `feat/v1.2.0-bugs-bundles-hooks`. Restante (automação vi
 - `.github/PULL_REQUEST_TEMPLATE.md` — dogfood o próprio `/pr-template`
 **Estimativa:** 2h pra tudo
 
-### FEAT-028: Hooks cross-platform (rewrite em Node.js)
-**Motivação:** Hooks atuais são `.sh` puro. Windows nativo (sem WSL) não executa — falha silenciosa. Parsing via `grep | sed` é frágil com filenames contendo caracteres especiais.
-**Escopo:**
-- Reescrever 4 hook scripts em Node.js (`.mjs` executável com shebang `#!/usr/bin/env node`)
-- Usa `JSON.parse(stdin)` robusto em vez de regex
-- Output idêntico (compatível com formato atual do Claude Code)
-- `src/commands/hooks.ts` atualizado pra copiar `.mjs` em vez de `.sh`
-- Adicionar testes de integração: spawn do script com payload JSON e assert no stdout
-- Documentar no README: "funciona em Linux, Mac, Windows nativo e WSL"
-**Estimativa:** 4-6h
-**Impacto:** Suporte real a Windows; robustez de parsing
+### FEAT-028: Hooks cross-platform (rewrite em Node.js) — ✅ resolvido em 1.2.0
+_Concluído. Scripts agora em `.mjs`, testes de integração com `spawnSync`, cleanup automático de `.sh` legados._
 
 ---
 
@@ -338,10 +332,8 @@ _Concluído na branch `feat/v1.2.0-bugs-bundles-hooks`. Validação compartilhad
 **Solução:** Flag `--verbose` ou env var `CLAUDIAO_DEBUG=1` que ativa logs detalhados em todos os commands.
 **Nota:** Escalado como FEAT-030 (promovido de debt para feature por impacto em adoção).
 
-### DEBT-007: Hook scripts sem testes de integração
-**Onde:** `templates/hooks/*.sh`
-**Problema:** Os 4 hooks em bash são testados apenas ao nível de lógica de merge/remove em settings.json (via unit test). O fluxo real (stdin → parsing → stdout JSON) não tem cobertura. Bug de parsing em filename com caracteres especiais passa silencioso.
-**Solução:** Teste que spawna o script com payload JSON realista e faz assert no stdout. Escopo de FEAT-028 (rewrite em Node) resolve naturalmente.
+### DEBT-007: Hook scripts sem testes de integração — ✅ resolvido em 1.2.0
+_Concluído junto com FEAT-028. Integration tests em `src/lib/__tests__/hook-scripts.integration.test.ts`._
 
 ### DEBT-008: README desatualizado vs versão atual
 **Onde:** `README.md`

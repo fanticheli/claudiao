@@ -204,10 +204,12 @@ O wizard gera o arquivo `.md` com frontmatter YAML diretamente em `~/.claude/age
 ### Listar
 
 ```bash
-claudiao list agents       # Lista agentes instalados por categoria
-claudiao list skills       # Lista skills (slash commands)
+claudiao list agents       # Lista agentes instalados por categoria, com [core|external|local]
+claudiao list skills       # Lista skills (slash commands), com coluna de origem
 claudiao list plugins      # Lista plugins da comunidade disponíveis
 ```
+
+A coluna de origem (`core` / `external` / `local`) aparece a partir da v1.2.0 e ajuda a debugar quando um agent/skill vem do pacote bundled, do seu [repo externo](#repo-externo-avançado) ou foi criado manualmente.
 
 ### Instalar plugins
 
@@ -223,6 +225,26 @@ claudiao install plugin claude-mem       # Memória entre sessões
 claudiao remove agent go-specialist
 claudiao remove skill deploy-checklist
 ```
+
+### Hooks (lembretes de skill)
+
+Hooks são lembretes não-bloqueantes injetados pelo Claude Code em momentos-chave — editar endpoint lembra de `/security-checklist`, editar migration lembra de `/sql-templates`, etc. A partir da v1.2.0 os scripts são Node.js (`.mjs`), funcionam em Linux, macOS e Windows nativo sem dependências externas.
+
+```bash
+claudiao hooks install                    # seleção interativa dos 4 hooks bundled
+claudiao hooks install --only security    # instala apenas um tipo
+claudiao hooks list                       # mostra hooks ativos
+claudiao hooks uninstall                  # remove apenas os hooks do claudião, preserva outros
+```
+
+Os hooks editam `~/.claude/settings.json` fazendo merge (não overwrite) — hooks de outros plugins ficam intactos. Scripts ficam em `~/.claude/hooks/claudiao-*.mjs` e podem ser editados pra customizar as mensagens.
+
+| Hook | Matcher | Quando lembra |
+|------|---------|---------------|
+| `security` | `Write\|Edit` em paths com `controller`, `route`, `handler`, `/api/`, `/auth/` | `/security-checklist` antes de declarar endpoint pronto |
+| `ui` | `Write\|Edit` em `.tsx/.jsx/.vue/.svelte` ou `components/pages/views` | `/ui-review-checklist` antes de abrir PR |
+| `migration` | `Write` em `migrations/`, `*.sql`, `alembic/versions`, `prisma/migrations` | Patterns zero-downtime de `/sql-templates` |
+| `commit` | `Bash` com `git commit -m "..."` | Valida formato conventional commits |
 
 ## Agentes incluídos (18)
 
