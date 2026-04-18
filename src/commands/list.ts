@@ -1,9 +1,9 @@
 import { readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import chalk from 'chalk';
-import { CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR } from '../lib/paths.js';
+import { CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, PACKAGE_ROOT } from '../lib/paths.js';
 import { parseAgentFile, parseSkillFile } from '../lib/frontmatter.js';
-import { isSymlink } from '../lib/symlinks.js';
+import { getInstallSource } from '../lib/symlinks.js';
 import { banner, heading, table, info } from '../lib/format.js';
 import { PLUGINS } from '../lib/plugins.js';
 
@@ -25,12 +25,14 @@ export function listAgents(): void {
 
   const rows = files.map(file => {
     const filePath = join(CLAUDE_AGENTS_DIR, file);
+    const source = getInstallSource(filePath, PACKAGE_ROOT);
     try {
       const meta = parseAgentFile(filePath);
       return {
         name: meta.name || file.replace('.md', ''),
         description: meta.description.slice(0, 70),
         category: meta.category || 'other',
+        source,
         status: 'installed' as const,
       };
     } catch {
@@ -38,6 +40,7 @@ export function listAgents(): void {
         name: file.replace('.md', ''),
         description: chalk.dim('(erro ao ler frontmatter)'),
         category: 'other',
+        source,
         status: 'installed' as const,
       };
     }
@@ -100,13 +103,16 @@ export function listSkills(): void {
   }
 
   const rows = dirs.map(d => {
-    const skillFile = join(CLAUDE_SKILLS_DIR, d.name, 'SKILL.md');
+    const skillDir = join(CLAUDE_SKILLS_DIR, d.name);
+    const skillFile = join(skillDir, 'SKILL.md');
+    const source = getInstallSource(skillDir, PACKAGE_ROOT);
     try {
       if (existsSync(skillFile)) {
         const meta = parseSkillFile(skillFile);
         return {
           name: '/' + (meta.name || d.name),
           description: meta.description.slice(0, 70),
+          source,
         };
       }
     } catch {
@@ -115,6 +121,7 @@ export function listSkills(): void {
     return {
       name: '/' + d.name,
       description: '',
+      source,
     };
   });
 

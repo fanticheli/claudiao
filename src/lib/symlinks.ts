@@ -78,6 +78,23 @@ export function createSymlink(source: string, target: string): LinkResult {
   return { status: 'created' };
 }
 
+/**
+ * Returns the source type of an installed symlink. Distinguishes items
+ * that ship with the claudiao package from items linked out of an
+ * external user-managed repo, and from files the user created manually
+ * (no symlink at all).
+ */
+export type InstallSource = 'core' | 'external' | 'local';
+
+export function getInstallSource(linkPath: string, packageRoot: string): InstallSource {
+  if (!isSymlink(linkPath)) return 'local';
+  const target = getSymlinkTarget(linkPath);
+  if (!target) return 'local';
+  const absoluteTarget = isAbsolute(target) ? target : resolve(dirname(linkPath), target);
+  const resolvedRoot = resolve(packageRoot);
+  return absoluteTarget.startsWith(resolvedRoot) ? 'core' : 'external';
+}
+
 export function removeSymlink(path: string): boolean {
   if (isSymlink(path)) {
     rmSync(path);

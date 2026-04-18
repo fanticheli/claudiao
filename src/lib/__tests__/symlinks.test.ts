@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, existsSync, readFileSync, readlinkSync, ren
 import { rmSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { ensureDir, isSymlink, createSymlink, removeSymlink } from '../symlinks.js';
+import { ensureDir, isSymlink, createSymlink, getInstallSource, removeSymlink } from '../symlinks.js';
 
 const isPosix = process.platform !== 'win32';
 
@@ -184,6 +184,41 @@ describe('createSymlink — relative path (BUG-002)', () => {
 
     expect(result.status).toBe('updated');
     expect(isAbsolute(readlinkSync(target))).toBe(false);
+  });
+});
+
+describe('getInstallSource', () => {
+  it.skipIf(!isPosix)('returns "core" when link target is inside packageRoot', () => {
+    const dir = makeTmp();
+    const packageRoot = join(dir, 'package');
+    const source = join(packageRoot, 'templates', 'agents', 'a.md');
+    const target = join(dir, 'installed', 'a.md');
+    ensureDir(join(packageRoot, 'templates', 'agents'));
+    writeFileSync(source, 'x');
+    createSymlink(source, target);
+
+    expect(getInstallSource(target, packageRoot)).toBe('core');
+  });
+
+  it.skipIf(!isPosix)('returns "external" when target is outside packageRoot', () => {
+    const dir = makeTmp();
+    const packageRoot = join(dir, 'package');
+    ensureDir(packageRoot);
+    const source = join(dir, 'external-repo', 'a.md');
+    const target = join(dir, 'installed', 'a.md');
+    ensureDir(join(dir, 'external-repo'));
+    writeFileSync(source, 'x');
+    createSymlink(source, target);
+
+    expect(getInstallSource(target, packageRoot)).toBe('external');
+  });
+
+  it('returns "local" when path is a regular file', () => {
+    const dir = makeTmp();
+    const file = join(dir, 'regular.md');
+    writeFileSync(file, 'x');
+
+    expect(getInstallSource(file, dir)).toBe('local');
   });
 });
 
