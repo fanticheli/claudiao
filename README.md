@@ -41,6 +41,8 @@ Tudo instalado via symlinks — edite os templates e as mudanças refletem insta
 npm install -g claudiao
 ```
 
+> Mudanças por versão em [CHANGELOG.md](./CHANGELOG.md).
+
 ## Setup rápido
 
 ```bash
