@@ -5,11 +5,18 @@ import chalk from 'chalk';
 import { getExternalRepoPath, getAgentsSource, getSkillsSource, CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, CONFIG_FILE } from '../lib/paths.js';
 import { createSymlink, ensureDir, isSymlink, getSymlinkTarget } from '../lib/symlinks.js';
 import { getPackageVersion } from '../lib/package-info.js';
+import {
+  validateAgentFrontmatter,
+  validateSkillFrontmatter,
+  hasErrors,
+  hasWarnings,
+} from '../lib/validate-frontmatter.js';
 import { banner, success, warn, error, heading, info } from '../lib/format.js';
 
 export function update(options?: { force?: boolean; dryRun?: boolean }): void {
   const force = options?.force ?? false;
   const dryRun = options?.dryRun ?? false;
+  let invalidCount = 0;
   banner();
 
   if (dryRun) {
@@ -53,12 +60,27 @@ export function update(options?: { force?: boolean; dryRun?: boolean }): void {
       const source = join(agentsSource, file);
       const target = join(CLAUDE_AGENTS_DIR, file);
 
+      const validation = validateAgentFrontmatter(source);
+      if (hasErrors(validation)) {
+        const errs = validation.issues.filter((i) => i.severity === 'error');
+        error(`${file}: frontmatter invalido (${errs.map((i) => i.message).join('; ')})`);
+        invalidCount++;
+        continue;
+      }
+      const warnings = hasWarnings(validation)
+        ? validation.issues.filter((i) => i.severity === 'warn')
+        : [];
+
       if (!existsSync(target)) {
         if (dryRun) {
           info(`[dry-run] Linkaria novo agente: ${file.replace('.md', '')}`);
         } else {
           createSymlink(source, target);
-          success(`Novo agente: ${file.replace('.md', '')}`);
+          if (warnings.length > 0) {
+            warn(`Novo agente ${file.replace('.md', '')}: ${warnings.map((i) => i.message).join('; ')}`);
+          } else {
+            success(`Novo agente: ${file.replace('.md', '')}`);
+          }
         }
         newAgents++;
       } else if (force) {
@@ -92,6 +114,17 @@ export function update(options?: { force?: boolean; dryRun?: boolean }): void {
     for (const dir of skillDirs) {
       const source = join(skillsSource, dir);
       const target = join(CLAUDE_SKILLS_DIR, dir);
+      const skillMd = join(source, 'SKILL.md');
+
+      if (existsSync(skillMd)) {
+        const validation = validateSkillFrontmatter(skillMd);
+        if (hasErrors(validation)) {
+          const errs = validation.issues.filter((i) => i.severity === 'error');
+          error(`/${dir}: frontmatter invalido (${errs.map((i) => i.message).join('; ')})`);
+          invalidCount++;
+          continue;
+        }
+      }
 
       if (!existsSync(target)) {
         if (dryRun) {
@@ -162,5 +195,9 @@ export function update(options?: { force?: boolean; dryRun?: boolean }): void {
 
   console.log('');
   success('Atualizacao concluida!');
+  if (invalidCount > 0) {
+    warn(`${invalidCount} item(s) pulados por frontmatter invalido. Rode ${chalk.yellow('claudiao doctor')} pra detalhes.`);
+    process.exitCode = 1;
+  }
   console.log('');
 }
