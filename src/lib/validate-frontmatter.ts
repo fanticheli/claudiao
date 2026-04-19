@@ -26,6 +26,10 @@ const TRIGGER_HINTS = [
 
 const MIN_DESCRIPTION_LENGTH = 50;
 
+function isStringArray(v: unknown): v is string[] {
+  return Array.isArray(v) && v.every((x) => typeof x === 'string');
+}
+
 /**
  * Validates an agent's frontmatter. Returns list of issues — empty if all OK.
  */
@@ -62,8 +66,10 @@ export function validateAgentFrontmatter(filePath: string): ValidationResult {
 
   if (!data.tools) {
     issues.push({ field: 'tools', severity: 'warn', message: 'campo `tools` ausente (default: todas)' });
-  } else if (typeof data.tools !== 'string') {
-    issues.push({ field: 'tools', severity: 'error', message: 'campo `tools` deve ser string CSV' });
+  } else if (typeof data.tools !== 'string' && !isStringArray(data.tools)) {
+    // Claude Code aceita tanto string CSV ("Read, Write") quanto array YAML
+    // (- Read\n  - Write). Rejeitamos apenas formatos que não sejam nenhum dos dois.
+    issues.push({ field: 'tools', severity: 'error', message: 'campo `tools` deve ser string CSV ou array de strings' });
   }
 
   if (!data.model) {
