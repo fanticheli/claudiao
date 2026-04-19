@@ -24,6 +24,31 @@ export function getSymlinkTarget(path: string): string | null {
 }
 
 /**
+ * Resolves the raw readlink value against the symlink's directory, so a
+ * relative link like `../../pkg/foo.md` lands at the right absolute path
+ * regardless of process CWD. Returns null if `path` is not a symlink.
+ */
+export function resolveSymlinkTarget(path: string): string | null {
+  const target = getSymlinkTarget(path);
+  if (target === null) return null;
+  return isAbsolute(target) ? target : resolve(dirname(path), target);
+}
+
+/**
+ * True when `path` is a symlink whose target does not exist. A regular
+ * file or missing path returns false — this is strictly about dangling
+ * symlinks, not "anything broken". Fixes a regression from 1.2.0 where
+ * callers used `existsSync(readlinkSync(path))`, which resolves relative
+ * link values against CWD instead of the symlink directory.
+ */
+export function isSymlinkBroken(path: string): boolean {
+  if (!isSymlink(path)) return false;
+  const resolved = resolveSymlinkTarget(path);
+  if (!resolved) return true;
+  return !existsSync(resolved);
+}
+
+/**
  * Builds the link path stored in the symlink. On POSIX we use a path
  * relative to the symlink location so installs survive node_modules
  * relocations (BUG-002). On Windows, absolute paths are required for

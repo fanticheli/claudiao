@@ -183,7 +183,14 @@ hooks
   .command('uninstall')
   .description('Remove hooks do claudiao de settings.json (preserva hooks de outros plugins)')
   .option('-y, --yes', 'Pula confirmacao interativa')
-  .action(async (options: { yes?: boolean }) => {
+  .option('--only <categories>', 'Remove apenas categorias especificas (ex: ui,migration)')
+  .addHelpText('after', `
+Exemplos:
+  claudiao hooks uninstall
+  claudiao hooks uninstall --only ui
+  claudiao hooks uninstall --only ui,migration --yes
+  `)
+  .action(async (options: { yes?: boolean; only?: string }) => {
     await uninstallHooks(options);
   });
 

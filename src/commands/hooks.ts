@@ -8,6 +8,8 @@ import {
   writeSettings,
   removeClaudiaoHooks,
   listInstalledHooks,
+  migrateClaudiaoHookMatchers,
+  parseOnlyFlag,
   SETTINGS_FILE,
 } from '../lib/hooks.js';
 import { banner, success, warn, error, info, heading, dim, separator } from '../lib/format.js';
@@ -22,23 +24,30 @@ export async function installHooks(options?: { only?: string; dryRun?: boolean }
     console.log('');
   }
 
+  // Silently heal hooks installed by older claudiao versions whose
+  // matcher drifted (e.g. migration shipped as 'Write' in 1.2.0 and is
+  // 'Write|Edit' from 1.2.1 on).
+  if (!dryRun) {
+    const migrated = migrateClaudiaoHookMatchers();
+    if (migrated > 0) {
+      dim(`Migrados ${migrated} hook(s) com matchers desatualizados de versões anteriores.`);
+    }
+  }
+
   // Resolve categorias a instalar
   let selected: HookCategory[];
   if (options?.only) {
-    const requested = options.only.split(',').map((s) => s.trim().toLowerCase());
-    const found: HookCategory[] = [];
-    const missing: string[] = [];
-    for (const id of requested) {
-      const cat = HOOK_CATEGORIES.find((c) => c.id === id);
-      if (cat) found.push(cat);
-      else missing.push(id);
-    }
-    if (missing.length > 0) {
-      error(`Categorias desconhecidas: ${missing.join(', ')}`);
+    const parsed = parseOnlyFlag(options.only);
+    if (!parsed.ok) {
+      error(`Categorias desconhecidas: ${parsed.invalid.join(', ')}`);
       dim(`Disponíveis: ${HOOK_CATEGORIES.map((c) => c.id).join(', ')}`);
       process.exit(1);
     }
-    selected = found;
+    if (parsed.categories.length === 0) {
+      error('Nenhuma categoria informada em --only.');
+      process.exit(1);
+    }
+    selected = parsed.categories;
   } else {
     // Interactive: multi-select
     console.log(chalk.dim('  Hooks lembram de invocar skills em momentos críticos.'));
@@ -100,9 +109,24 @@ export async function installHooks(options?: { only?: string; dryRun?: boolean }
   console.log('');
 }
 
-export async function uninstallHooks(options?: { yes?: boolean }): Promise<void> {
+export async function uninstallHooks(options?: { yes?: boolean; only?: string }): Promise<void> {
   banner();
   heading('Removendo hooks do claudiao');
+
+  let filterIds: string[] | undefined;
+  if (options?.only) {
+    const parsed = parseOnlyFlag(options.only);
+    if (!parsed.ok) {
+      error(`Categorias desconhecidas: ${parsed.invalid.join(', ')}`);
+      dim(`Disponíveis: ${HOOK_CATEGORIES.map((c) => c.id).join(', ')}`);
+      process.exit(1);
+    }
+    if (parsed.categories.length === 0) {
+      error('Nenhuma categoria informada em --only.');
+      process.exit(1);
+    }
+    filterIds = parsed.categories.map((c) => c.id);
+  }
 
   const installed = listInstalledHooks();
   if (installed.length === 0) {
@@ -110,18 +134,30 @@ export async function uninstallHooks(options?: { yes?: boolean }): Promise<void>
     return;
   }
 
-  console.log(chalk.dim(`  ${installed.length} hook(s) do claudiao encontrado(s):`));
-  for (const h of installed) {
+  const targeted = filterIds
+    ? installed.filter((h) => h.category !== null && filterIds!.includes(h.category))
+    : installed;
+
+  if (targeted.length === 0) {
+    info('Nenhum hook correspondente a --only instalado. Nada a remover.');
+    return;
+  }
+
+  console.log(chalk.dim(`  ${targeted.length} hook(s) do claudiao a remover:`));
+  for (const h of targeted) {
     console.log(`    - ${h.event} / matcher=${chalk.dim(h.matcher)} / categoria=${chalk.yellow(h.category ?? '?')}`);
   }
   console.log('');
 
   if (!options?.yes) {
+    const message = filterIds
+      ? `Remover hooks das categorias [${filterIds.join(', ')}]? (scripts em ~/.claude/hooks/ não são apagados)`
+      : 'Remover todos os hooks do claudiao? (scripts em ~/.claude/hooks/ não são apagados)';
     const { confirm } = await inquirer.prompt<{ confirm: boolean }>([
       {
         type: 'confirm',
         name: 'confirm',
-        message: 'Remover todos os hooks do claudiao? (scripts em ~/.claude/hooks/ não são apagados)',
+        message,
         default: false,
       },
     ]);
@@ -131,7 +167,7 @@ export async function uninstallHooks(options?: { yes?: boolean }): Promise<void>
     }
   }
 
-  const { removedCount, categoriesRemoved } = removeClaudiaoHooks();
+  const { removedCount, categoriesRemoved } = removeClaudiaoHooks(filterIds);
 
   if (removedCount === 0) {
     info('Nada foi removido.');
