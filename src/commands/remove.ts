@@ -5,6 +5,7 @@ import inquirer from 'inquirer';
 import { CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, getAgentsSavePath } from '../lib/paths.js';
 import { removeSymlink, isSymlink } from '../lib/symlinks.js';
 import { banner, success, error, heading, warn, info, dim, raw } from '../lib/format.js';
+import { dryRunnable } from '../lib/dry-run.js';
 
 export async function removeAgent(name: string, options?: { dryRun?: boolean }): Promise<void> {
   const dryRun = options?.dryRun ?? false;
@@ -36,24 +37,20 @@ export async function removeAgent(name: string, options?: { dryRun?: boolean }):
     return;
   }
 
-  if (dryRun) {
-    const isLink = isSymlink(symlinkPath);
-    if (isLink) {
-      info(`[dry-run] Removeria symlink: ~/.claude/agents/${name}.md`);
-    } else {
-      info(`[dry-run] Removeria arquivo: ~/.claude/agents/${name}.md`);
-    }
-  } else {
-    // Remove symlink
+  const isLink = isSymlink(symlinkPath);
+  const dryRemoveMsg = isLink
+    ? `Removeria symlink: ~/.claude/agents/${name}.md`
+    : `Removeria arquivo: ~/.claude/agents/${name}.md`;
+
+  dryRunnable({ dryRun }, () => {
     const removed = removeSymlink(symlinkPath);
     if (removed) {
       success(`Symlink removido: ~/.claude/agents/${name}.md`);
     } else {
-      // Not a symlink, just delete
       rmSync(symlinkPath);
       success(`Arquivo removido: ~/.claude/agents/${name}.md`);
     }
-  }
+  }, dryRemoveMsg);
 
   // Ask if should also remove source
   const savePath = getAgentsSavePath();
@@ -111,14 +108,12 @@ export async function removeSkill(name: string, options?: { dryRun?: boolean }):
     return;
   }
 
-  if (dryRun) {
-    const isLink = isSymlink(symlinkPath);
-    if (isLink) {
-      info(`[dry-run] Removeria symlink: ~/.claude/skills/${name}`);
-    } else {
-      info(`[dry-run] Removeria diretorio: ~/.claude/skills/${name}`);
-    }
-  } else {
+  const isLink = isSymlink(symlinkPath);
+  const dryRemoveMsg = isLink
+    ? `Removeria symlink: ~/.claude/skills/${name}`
+    : `Removeria diretorio: ~/.claude/skills/${name}`;
+
+  dryRunnable({ dryRun }, () => {
     const removed = removeSymlink(symlinkPath);
     if (removed) {
       success(`Symlink removido: ~/.claude/skills/${name}`);
@@ -126,7 +121,7 @@ export async function removeSkill(name: string, options?: { dryRun?: boolean }):
       rmSync(symlinkPath, { recursive: true });
       success(`Diretorio removido: ~/.claude/skills/${name}`);
     }
-  }
+  }, dryRemoveMsg);
 
   raw('');
 }
