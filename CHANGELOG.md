@@ -7,6 +7,13 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.3.2] — 2026-04-19
+
+### Fixed
+
+- **Stop hook emitia JSON inválido**: `claudiao-pr-reminder.mjs` usava `hookSpecificOutput.hookEventName: "Stop"`, mas o schema do Claude Code só aceita `hookSpecificOutput` para `PreToolUse`/`UserPromptSubmit`/`PostToolUse`. Trocamos para `systemMessage` no top-level (campo válido para Stop hooks). Bug introduzido na v1.3.0.
+- **Validador de frontmatter rejeitava `tools` em YAML array**: agents legítimos que usam o estilo `tools:\n  - Read\n  - Write` (suportado pelo Claude Code) eram flagados como `error` no `claudiao doctor`. O validador agora aceita CSV string *ou* array de strings. Só rejeita formatos que não são nenhum dos dois (ex: objeto aninhado).
+
 ## [1.3.1] — 2026-04-19
 
 ### Fixed
