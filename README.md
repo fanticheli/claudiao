@@ -2,7 +2,7 @@
 
 CLI que instala e gerencia agentes, skills, hooks e CLAUDE.md global para o [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
-> Seu Claude Code no próximo nível. **18 agentes + 9 skills + 5 hooks + CLAUDE.md global + wizard de criação + doctor** — tudo em um comando.
+> Seu Claude Code no próximo nível. **18 agentes + 9 skills + 5 hooks + statusline de contexto + CLAUDE.md global + wizard de criação + doctor** — tudo em um comando.
 
 ## Pra quem é isso?
 
@@ -23,6 +23,7 @@ O [Claude Code](https://docs.anthropic.com/en/docs/claude-code) é uma CLI da An
 | **Agentes** | 18 | Subagents que o Claude Code invoca automaticamente pelo contexto (ex: perguntou sobre AWS? o `aws-specialist` entra em ação) |
 | **Skills** | 9 | Slash commands com templates e checklists prontos (ex: `/security-checklist` antes de deploy) |
 | **CLAUDE.md global** | 1 | Regras universais de código, git workflow e referência a todos os agentes/skills — muda o comportamento do Claude Code em **todos** os seus projetos |
+| **Statusline de contexto** | 1 | Barra no rodapé do Claude Code mostrando dir, branch, modelo, % de contexto usado e custo acumulado da sessão |
 | **Wizard de criação** | — | Crie seus próprios agentes e skills com um wizard interativo |
 | **Doctor** | — | Diagnóstico automático de problemas de instalação |
 
@@ -221,6 +222,25 @@ claudiao hooks uninstall --only pr             # remove apenas uma categoria
 ```
 
 Os hooks editam `~/.claude/settings.json` fazendo merge (não overwrite) — hooks de outros plugins ficam intactos. Scripts ficam em `~/.claude/hooks/claudiao-*.mjs` e podem ser editados pra customizar as mensagens.
+
+### Statusline de contexto (v1.5.0+)
+
+Barra no rodapé do Claude Code com informação em tempo real da sessão: diretório, branch do git, modelo em uso, porcentagem de contexto consumida (verde <60%, amarelo 60-85%, vermelho >85%) e custo acumulado em USD.
+
+```
+📁 claudiao │ feat/v1.5.0-statusline │ Opus 4.7 (1M context) │ ██░░░░░░░░ 17% │ $11.46
+```
+
+Por que: quem usa Opus com 1M de contexto precisa saber quando a conversa tá chegando no limite — o claudião calcula baseado no campo `context_window.used_percentage` que o Claude Code envia.
+
+```bash
+claudiao statusline install           # instala (pergunta se já houver statusLine de outra origem)
+claudiao statusline install --force   # substitui sem perguntar
+claudiao statusline list              # mostra o que está configurado
+claudiao statusline uninstall         # remove só se foi o claudião que instalou
+```
+
+O script vive em `~/.claude/statusline/context-bar.mjs` (cópia do template bundled, igual aos hooks). Pode ser editado pra customizar o formato. `claudiao statusline uninstall` preserva statusLines de outras origens — só remove se detectar que o path pertence ao claudião.
 
 | Hook | Evento | Matcher | Quando lembra |
 |------|--------|---------|---------------|
