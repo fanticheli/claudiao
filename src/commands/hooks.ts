@@ -12,7 +12,7 @@ import {
   parseOnlyFlag,
   SETTINGS_FILE,
 } from '../lib/hooks.js';
-import { banner, success, warn, error, info, heading, dim, separator } from '../lib/format.js';
+import { banner, success, warn, error, info, heading, dim, separator, raw } from '../lib/format.js';
 
 export async function installHooks(options?: { only?: string; dryRun?: boolean }): Promise<void> {
   banner();
@@ -21,7 +21,7 @@ export async function installHooks(options?: { only?: string; dryRun?: boolean }
   const dryRun = options?.dryRun ?? false;
   if (dryRun) {
     info('[dry-run] Nenhuma alteração será feita');
-    console.log('');
+    raw('');
   }
 
   // Silently heal hooks installed by older claudiao versions whose
@@ -50,9 +50,9 @@ export async function installHooks(options?: { only?: string; dryRun?: boolean }
     selected = parsed.categories;
   } else {
     // Interactive: multi-select
-    console.log(chalk.dim('  Hooks lembram de invocar skills em momentos críticos.'));
-    console.log(chalk.dim('  São lembretes não-bloqueantes injetados no contexto do Claude.'));
-    console.log('');
+    raw(chalk.dim('  Hooks lembram de invocar skills em momentos críticos.'));
+    raw(chalk.dim('  São lembretes não-bloqueantes injetados no contexto do Claude.'));
+    raw('');
 
     const { picked } = await inquirer.prompt<{ picked: string[] }>([
       {
@@ -76,11 +76,11 @@ export async function installHooks(options?: { only?: string; dryRun?: boolean }
   }
 
   // Mostra o que vai ser feito
-  console.log('');
+  raw('');
   for (const cat of selected) {
     info(`${chalk.bold(cat.name)} — ${chalk.dim(cat.description)}`);
   }
-  console.log('');
+  raw('');
 
   if (dryRun) {
     info(`[dry-run] Copiaria ${selected.length} script(s) pra ~/.claude/hooks/`);
@@ -98,15 +98,15 @@ export async function installHooks(options?: { only?: string; dryRun?: boolean }
   success(`Hooks registrados em ${SETTINGS_FILE}`);
 
   separator();
-  console.log(chalk.green.bold('  Hooks do claudiao ativos.'));
+  raw(chalk.green.bold('  Hooks do claudiao ativos.'));
   separator();
 
-  console.log(chalk.bold('  Próximos passos:'));
-  console.log(`  ${chalk.cyan('1.')} Abra uma nova sessão do Claude Code (os hooks carregam no SessionStart)`);
-  console.log(`  ${chalk.cyan('2.')} Edite um endpoint/componente/migration — o lembrete aparece automaticamente`);
-  console.log(`  ${chalk.cyan('3.')} Rode ${chalk.yellow('claudiao hooks list')} pra ver o que está ativo`);
-  console.log(`  ${chalk.cyan('4.')} Rode ${chalk.yellow('claudiao hooks uninstall')} pra remover`);
-  console.log('');
+  raw(chalk.bold('  Próximos passos:'));
+  raw(`  ${chalk.cyan('1.')} Abra uma nova sessão do Claude Code (os hooks carregam no SessionStart)`);
+  raw(`  ${chalk.cyan('2.')} Edite um endpoint/componente/migration — o lembrete aparece automaticamente`);
+  raw(`  ${chalk.cyan('3.')} Rode ${chalk.yellow('claudiao hooks list')} pra ver o que está ativo`);
+  raw(`  ${chalk.cyan('4.')} Rode ${chalk.yellow('claudiao hooks uninstall')} pra remover`);
+  raw('');
 }
 
 export async function uninstallHooks(options?: { yes?: boolean; only?: string }): Promise<void> {
@@ -143,12 +143,12 @@ export async function uninstallHooks(options?: { yes?: boolean; only?: string })
     return;
   }
 
-  console.log(chalk.dim(`  ${targeted.length} hook(s) do claudiao a remover:`));
+  raw(chalk.dim(`  ${targeted.length} hook(s) do claudiao a remover:`));
   for (const h of targeted) {
     const matcherLabel = h.matcher.length > 0 ? h.matcher : '(none)';
-    console.log(`    - ${h.event} / matcher=${chalk.dim(matcherLabel)} / categoria=${chalk.yellow(h.category ?? '?')}`);
+    raw(`    - ${h.event} / matcher=${chalk.dim(matcherLabel)} / categoria=${chalk.yellow(h.category ?? '?')}`);
   }
-  console.log('');
+  raw('');
 
   if (!options?.yes) {
     const message = filterIds
@@ -180,7 +180,7 @@ export async function uninstallHooks(options?: { yes?: boolean; only?: string })
     dim(`Categorias: ${categoriesRemoved.join(', ')}`);
   }
   dim('Os scripts em ~/.claude/hooks/ foram mantidos (remova manualmente se quiser).');
-  console.log('');
+  raw('');
 }
 
 export function listHooks(): void {
@@ -191,14 +191,14 @@ export function listHooks(): void {
 
   if (installed.length === 0) {
     info('Nenhum hook do claudiao instalado.');
-    console.log('');
+    raw('');
     dim(`Instale com: ${chalk.yellow('claudiao hooks install')}`);
-    console.log('');
-    console.log(chalk.bold('  Categorias disponíveis:'));
+    raw('');
+    raw(chalk.bold('  Categorias disponíveis:'));
     for (const cat of HOOK_CATEGORIES) {
-      console.log(`    ${chalk.yellow(cat.id.padEnd(12))}${chalk.dim(cat.description)}`);
+      raw(`    ${chalk.yellow(cat.id.padEnd(12))}${chalk.dim(cat.description)}`);
     }
-    console.log('');
+    raw('');
     return;
   }
 
@@ -206,21 +206,21 @@ export function listHooks(): void {
     const cat = HOOK_CATEGORIES.find((c) => c.id === h.category);
     const name = cat?.name ?? 'desconhecido';
     const matcherLabel = h.matcher.length > 0 ? h.matcher : '(none)';
-    console.log(`  ${chalk.green('●')} ${chalk.bold(name)} ${chalk.dim('[' + h.category + ']')}`);
+    raw(`  ${chalk.green('●')} ${chalk.bold(name)} ${chalk.dim('[' + h.category + ']')}`);
     dim(`event=${h.event}  matcher=${matcherLabel}`);
     dim(`script=${h.command}`);
-    console.log('');
+    raw('');
   }
 
-  console.log(chalk.bold('  Categorias não instaladas:'));
+  raw(chalk.bold('  Categorias não instaladas:'));
   const installedIds = new Set(installed.map((h) => h.category));
   const available = HOOK_CATEGORIES.filter((c) => !installedIds.has(c.id));
   if (available.length === 0) {
     dim('(todas instaladas)');
   } else {
     for (const cat of available) {
-      console.log(`    ${chalk.dim('○')} ${chalk.yellow(cat.id.padEnd(12))}${chalk.dim(cat.description)}`);
+      raw(`    ${chalk.dim('○')} ${chalk.yellow(cat.id.padEnd(12))}${chalk.dim(cat.description)}`);
     }
   }
-  console.log('');
+  raw('');
 }

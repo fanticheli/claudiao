@@ -12,7 +12,7 @@ import {
   hasErrors,
   hasWarnings,
 } from '../lib/validate-frontmatter.js';
-import { banner, success, error, warn, heading, info } from '../lib/format.js';
+import { banner, success, error, warn, heading, info, raw } from '../lib/format.js';
 
 export async function createAgent(description?: string): Promise<void> {
   banner();
@@ -181,9 +181,9 @@ export async function createAgent(description?: string): Promise<void> {
   createSymlink(agentFilePath, target);
   success(`Symlink criado em ~/.claude/agents/${answers.name}.md`);
 
-  console.log('');
+  raw('');
   info(`Agente ${chalk.bold(answers.name)} pronto! Abra o Claude Code e ele sera invocado automaticamente.`);
-  console.log('');
+  raw('');
 }
 
 export async function createSkill(description?: string): Promise<void> {
@@ -303,7 +303,7 @@ export async function createSkill(description?: string): Promise<void> {
   createSymlink(skillDir, skillTarget);
   success(`Symlink criado em ~/.claude/skills/${answers.name}`);
 
-  console.log('');
+  raw('');
   info(`Skill pronta! Use ${chalk.yellow('/' + answers.name)} no Claude Code.`);
-  console.log('');
+  raw('');
 }

@@ -11,7 +11,7 @@ import {
   hasErrors,
   hasWarnings,
 } from '../lib/validate-frontmatter.js';
-import { banner, success, warn, error, heading, info } from '../lib/format.js';
+import { banner, success, warn, error, heading, info, dim, raw } from '../lib/format.js';
 
 export function update(options?: { force?: boolean; dryRun?: boolean }): void {
   const force = options?.force ?? false;
@@ -21,7 +21,7 @@ export function update(options?: { force?: boolean; dryRun?: boolean }): void {
 
   if (dryRun) {
     info('[dry-run] Nenhuma alteracao sera feita');
-    console.log('');
+    raw('');
   }
 
   const repoPath = getExternalRepoPath();
@@ -38,7 +38,7 @@ export function update(options?: { force?: boolean; dryRun?: boolean }): void {
           info('Repositorio ja esta atualizado');
         } else {
           success('Git pull concluido');
-          console.log(chalk.dim('    ' + result.trim()));
+          dim(result.trim());
         }
       } catch {
         warn('Falha no git pull (pode ser um diretorio local sem remote)');
@@ -193,11 +193,11 @@ export function update(options?: { force?: boolean; dryRun?: boolean }): void {
     info(`[dry-run] Sincronizaria version em .claudiao.json com ${getPackageVersion()}`);
   }
 
-  console.log('');
+  raw('');
   success('Atualizacao concluida!');
   if (invalidCount > 0) {
     warn(`${invalidCount} item(s) pulados por frontmatter invalido. Rode ${chalk.yellow('claudiao doctor')} pra detalhes.`);
     process.exitCode = 1;
   }
-  console.log('');
+  raw('');
 }
