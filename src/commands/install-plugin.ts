@@ -31,6 +31,9 @@ export function installPlugin(name: string): void {
     raw('');
     success(`${plugin.name} instalado!`);
   } catch (err) {
+    // expected: execSync exits non-zero when plugin install fails (network,
+    // auth, plugin repo unavailable). Surface a friendly retry hint; the full
+    // stderr already streamed via stdio: 'inherit'.
     raw('');
     error(`Falha ao instalar ${plugin.name}.`);
     info(`Tente manualmente: ${chalk.yellow(plugin.installCommand)}`);

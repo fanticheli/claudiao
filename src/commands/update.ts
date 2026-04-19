@@ -40,6 +40,9 @@ export function update(options?: { force?: boolean; dryRun?: boolean }): void {
           dim(result.trim());
         }
       } catch (err) {
+        // expected: external repoPath may point to a local clone without
+        // remote, or the remote may be unreachable. We warn and continue so
+        // the rest of the update flow (relink/orphan cleanup) still runs.
         warn('Falha no git pull (pode ser um diretorio local sem remote)');
         debug(`git pull error: ${err instanceof Error ? err.message : String(err)}`);
       }
