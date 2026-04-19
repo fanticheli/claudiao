@@ -6,13 +6,19 @@ import { ensureDir } from './symlinks.js';
 export const SETTINGS_FILE = join(CLAUDE_DIR, 'settings.json');
 export const HOOKS_DIR = join(CLAUDE_DIR, 'hooks');
 
+export type HookEvent = 'PreToolUse' | 'PostToolUse' | 'Stop';
+
 export interface HookCategory {
   id: string;
   name: string;
   description: string;
   script: string;
-  matcher: string;
-  event: 'PreToolUse' | 'PostToolUse';
+  /**
+   * Tool matcher for PreToolUse/PostToolUse events (e.g. 'Write|Edit').
+   * `null` for events that don't use matchers (e.g. Stop).
+   */
+  matcher: string | null;
+  event: HookEvent;
 }
 
 export interface ParsedOnlyFlag {
@@ -83,6 +89,14 @@ export const HOOK_CATEGORIES: HookCategory[] = [
     matcher: 'Bash',
     event: 'PreToolUse',
   },
+  {
+    id: 'pr',
+    name: 'PR reminder',
+    description: 'Lembra /pr-template e /security-checklist ao finalizar sessão com edits',
+    script: 'claudiao-pr-reminder.mjs',
+    matcher: null,
+    event: 'Stop',
+  },
 ];
 
 const LEGACY_SCRIPT_EXT = '.sh';
@@ -99,7 +113,7 @@ interface HookMatcher {
 }
 
 interface SettingsJson {
-  hooks?: Partial<Record<'PreToolUse' | 'PostToolUse' | 'SessionStart', HookMatcher[]>>;
+  hooks?: Partial<Record<'PreToolUse' | 'PostToolUse' | 'SessionStart' | 'Stop', HookMatcher[]>>;
   [key: string]: unknown;
 }
 
@@ -200,14 +214,17 @@ export function mergeHooksIntoSettings(categories: HookCategory[]): SettingsJson
     const command = join(HOOKS_DIR, cat.script);
     const list = (settings.hooks[cat.event] ?? []) as HookMatcher[];
 
-    const existing = list.find((m) => m.matcher === cat.matcher);
+    // For matcher-less events (e.g. Stop), group under entries without a
+    // `matcher` key. For matcher-aware events, group by matcher string.
+    const existing = list.find((m) =>
+      cat.matcher === null ? m.matcher === undefined : m.matcher === cat.matcher,
+    );
     if (existing) {
       existing.hooks.push({ type: 'command', command, timeout: 5 });
     } else {
-      list.push({
-        matcher: cat.matcher,
-        hooks: [{ type: 'command', command, timeout: 5 }],
-      });
+      const entry: HookMatcher = { hooks: [{ type: 'command', command, timeout: 5 }] };
+      if (cat.matcher !== null) entry.matcher = cat.matcher;
+      list.push(entry);
     }
 
     settings.hooks[cat.event] = list;
@@ -247,7 +264,8 @@ export function migrateClaudiaoHookMatchers(): number {
         const cat = findCategoryByScript(h.command);
         if (!cat) continue;
         if (cat.event !== event) continue;
-        if ((matcher.matcher ?? '') !== cat.matcher) {
+        const currentMatcher = matcher.matcher ?? null;
+        if (currentMatcher !== cat.matcher) {
           moves.push({ command: h.command, entry: h, target: cat });
         }
       }
@@ -268,11 +286,15 @@ export function migrateClaudiaoHookMatchers(): number {
 
     // Re-insert under the canonical matcher.
     for (const move of moves) {
-      const existing = filtered.find((m) => m.matcher === move.target.matcher);
+      const existing = filtered.find((m) =>
+        move.target.matcher === null ? m.matcher === undefined : m.matcher === move.target.matcher,
+      );
       if (existing) {
         existing.hooks.push(move.entry);
       } else {
-        filtered.push({ matcher: move.target.matcher, hooks: [move.entry] });
+        const entry: HookMatcher = { hooks: [move.entry] };
+        if (move.target.matcher !== null) entry.matcher = move.target.matcher;
+        filtered.push(entry);
       }
       migrated++;
     }

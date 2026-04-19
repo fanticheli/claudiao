@@ -145,7 +145,8 @@ export async function uninstallHooks(options?: { yes?: boolean; only?: string })
 
   console.log(chalk.dim(`  ${targeted.length} hook(s) do claudiao a remover:`));
   for (const h of targeted) {
-    console.log(`    - ${h.event} / matcher=${chalk.dim(h.matcher)} / categoria=${chalk.yellow(h.category ?? '?')}`);
+    const matcherLabel = h.matcher.length > 0 ? h.matcher : '(none)';
+    console.log(`    - ${h.event} / matcher=${chalk.dim(matcherLabel)} / categoria=${chalk.yellow(h.category ?? '?')}`);
   }
   console.log('');
 
@@ -204,8 +205,9 @@ export function listHooks(): void {
   for (const h of installed) {
     const cat = HOOK_CATEGORIES.find((c) => c.id === h.category);
     const name = cat?.name ?? 'desconhecido';
+    const matcherLabel = h.matcher.length > 0 ? h.matcher : '(none)';
     console.log(`  ${chalk.green('●')} ${chalk.bold(name)} ${chalk.dim('[' + h.category + ']')}`);
-    dim(`event=${h.event}  matcher=${h.matcher}`);
+    dim(`event=${h.event}  matcher=${matcherLabel}`);
     dim(`script=${h.command}`);
     console.log('');
   }
