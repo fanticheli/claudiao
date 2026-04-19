@@ -81,12 +81,12 @@ const message = [
   '  • Conventional commits em inglês? Branch name segue padrão do projeto?',
 ].join('\n');
 
+// Stop hooks não aceitam hookSpecificOutput no schema do Claude Code (esse
+// campo é exclusivo de PreToolUse/UserPromptSubmit/PostToolUse). Pra lembrar
+// o usuário sem bloquear, usamos systemMessage no top-level.
 process.stdout.write(
   JSON.stringify({
     continue: true,
-    hookSpecificOutput: {
-      hookEventName: 'Stop',
-      additionalContext: message,
-    },
+    systemMessage: message,
   }),
 );

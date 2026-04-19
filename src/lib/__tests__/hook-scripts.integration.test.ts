@@ -166,7 +166,7 @@ describe('claudiao-pr-reminder.mjs', () => {
     expect(mode & 0o100).toBe(0o100);
   });
 
-  it('emits reminder when tool_use_count > 0', () => {
+  it('emits reminder via systemMessage when tool_use_count > 0', () => {
     const { stdout, status } = runHook(SCRIPT, {
       session_id: 'test',
       hook_event_name: 'Stop',
@@ -175,15 +175,17 @@ describe('claudiao-pr-reminder.mjs', () => {
     expect(status).toBe(0);
     const parsed = JSON.parse(stdout) as {
       continue: boolean;
-      hookSpecificOutput?: { hookEventName?: string; additionalContext?: string };
+      systemMessage?: string;
+      hookSpecificOutput?: unknown;
     };
     expect(parsed.continue).toBe(true);
-    expect(parsed.hookSpecificOutput?.hookEventName).toBe('Stop');
-    expect(parsed.hookSpecificOutput?.additionalContext).toContain('/pr-template');
-    expect(parsed.hookSpecificOutput?.additionalContext).toContain('/security-checklist');
+    // Stop hooks must NOT use hookSpecificOutput (schema rejects it).
+    expect(parsed.hookSpecificOutput).toBeUndefined();
+    expect(parsed.systemMessage).toContain('/pr-template');
+    expect(parsed.systemMessage).toContain('/security-checklist');
   });
 
-  it('is quiet (no additionalContext) when tool_use_count is 0', () => {
+  it('is quiet (no systemMessage) when tool_use_count is 0', () => {
     const { stdout, status } = runHook(SCRIPT, {
       session_id: 'test',
       hook_event_name: 'Stop',
@@ -192,32 +194,30 @@ describe('claudiao-pr-reminder.mjs', () => {
     expect(status).toBe(0);
     const parsed = JSON.parse(stdout) as {
       continue: boolean;
+      systemMessage?: unknown;
       hookSpecificOutput?: unknown;
     };
     expect(parsed.continue).toBe(true);
+    expect(parsed.systemMessage).toBeUndefined();
     expect(parsed.hookSpecificOutput).toBeUndefined();
   });
 
   it('reminds when has_edits=true', () => {
     const { stdout } = runHook(SCRIPT, { has_edits: true });
-    const parsed = JSON.parse(stdout) as {
-      hookSpecificOutput?: { additionalContext?: string };
-    };
-    expect(parsed.hookSpecificOutput?.additionalContext).toContain('/pr-template');
+    const parsed = JSON.parse(stdout) as { systemMessage?: string };
+    expect(parsed.systemMessage).toContain('/pr-template');
   });
 
   it('is quiet when has_edits=false', () => {
     const { stdout } = runHook(SCRIPT, { has_edits: false });
-    const parsed = JSON.parse(stdout) as { hookSpecificOutput?: unknown };
-    expect(parsed.hookSpecificOutput).toBeUndefined();
+    const parsed = JSON.parse(stdout) as { systemMessage?: unknown };
+    expect(parsed.systemMessage).toBeUndefined();
   });
 
   it('degrades to remind when payload has no detectable signal', () => {
     const { stdout } = runHook(SCRIPT, { session_id: 't', hook_event_name: 'Stop' });
-    const parsed = JSON.parse(stdout) as {
-      hookSpecificOutput?: { additionalContext?: string };
-    };
-    expect(parsed.hookSpecificOutput?.additionalContext).toContain('/pr-template');
+    const parsed = JSON.parse(stdout) as { systemMessage?: string };
+    expect(parsed.systemMessage).toContain('/pr-template');
   });
 
   it('does not crash on malformed stdin', () => {
@@ -244,10 +244,8 @@ describe('claudiao-pr-reminder.mjs', () => {
 
     try {
       const { stdout } = runHook(SCRIPT, { transcript_path: transcriptPath });
-      const parsed = JSON.parse(stdout) as {
-        hookSpecificOutput?: { additionalContext?: string };
-      };
-      expect(parsed.hookSpecificOutput?.additionalContext).toContain('/pr-template');
+      const parsed = JSON.parse(stdout) as { systemMessage?: string };
+      expect(parsed.systemMessage).toContain('/pr-template');
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
@@ -270,8 +268,8 @@ describe('claudiao-pr-reminder.mjs', () => {
 
     try {
       const { stdout } = runHook(SCRIPT, { transcript_path: transcriptPath });
-      const parsed = JSON.parse(stdout) as { hookSpecificOutput?: unknown };
-      expect(parsed.hookSpecificOutput).toBeUndefined();
+      const parsed = JSON.parse(stdout) as { systemMessage?: unknown };
+      expect(parsed.systemMessage).toBeUndefined();
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
@@ -281,9 +279,7 @@ describe('claudiao-pr-reminder.mjs', () => {
     const { stdout } = runHook(SCRIPT, {
       transcript_path: '/nonexistent/path/should/not/exist.jsonl',
     });
-    const parsed = JSON.parse(stdout) as {
-      hookSpecificOutput?: { additionalContext?: string };
-    };
-    expect(parsed.hookSpecificOutput?.additionalContext).toContain('/pr-template');
+    const parsed = JSON.parse(stdout) as { systemMessage?: string };
+    expect(parsed.systemMessage).toContain('/pr-template');
   });
 });
