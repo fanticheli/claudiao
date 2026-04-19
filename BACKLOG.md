@@ -10,6 +10,11 @@
 > Entregue na branch `feat/v1.3.0-stop-hook-techdebt`. Foco em fechamento de loop (Stop hook) e consolidação de tech debt.
 
 - **Fechamento do loop do fluxo**: novo Stop hook (`pr`) lembra `/pr-template` e `/security-checklist` ao finalizar sessão com edits. Detecta sessões só-leitura via `tool_use_count`, `has_edits` ou parsing de `transcript_path` e passa em silêncio. Complementa FEAT-021 (hooks `PreToolUse` de edição) fechando o gap identificado na validação de 18/04/2026.
+- **DEBT-001 (catches silenciosos)**: cada catch legítimo ganhou comentário `// expected: <razão>` + `debug()` pra surfacar detalhe em modo verbose.
+- **DEBT-002 (output descentralizado)**: todos os `console.log/error/warn` em commands agora passam por `lib/format.ts`. Respeitam `setQuiet` e `setJsonMode` — `--quiet` e `--json` viram flags triviais de adicionar no futuro.
+- **DEBT-003 (duplicação de dry-run)**: helper `dryRunnable` em `lib/dry-run.ts`; `init`, `update` e `remove` agora usam esse wrapper em vez de if/else repetido.
+- **DEBT-006 (sem modo verbose)**: flag global `--verbose`/`-v` e env var `CLAUDIAO_DEBUG=1` ativam `[debug]` logging via stderr. README ganhou seção "Troubleshooting" apontando pro fluxo novo.
+- **Clarificação documental**: README ganhou seção "Relação com outros plugins do Claude Code" explicando que `superpowers`/`get-shit-done` são plugins separados (não bundled). BACKLOG registra que a feature de bundles foi adiada por falta de caso de uso concreto.
 
 ## ✅ Resolvido em 1.2.1
 
@@ -329,20 +334,14 @@ _FEAT-021 e FEAT-022 foram concluídas em 1.1.0 — ver seção "✅ Resolvido" 
 
 ## Tech debt
 
-### DEBT-001: Catch blocks silenciosos
-**Onde:** `paths.ts:48`, `init.ts:93`, `list.ts:36`, `doctor.ts:19`
-**Problema:** `catch { }` sem nenhum log dificulta debug quando algo dá errado silenciosamente.
-**Solução:** Adicionar `// expected: corrupt config` ou log em modo verbose.
+### DEBT-001: Catch blocks silenciosos — ✅ resolvido em 1.3.0
+_Anotação explícita `// expected: <razão>` em cada catch legítimo, + `debug()` via formato novo verbose. Runtime não é mais caixa preta — `--verbose`/`CLAUDIAO_DEBUG=1` expõe o motivo do ignore._
 
-### DEBT-002: `console.log` espalhado nos commands
-**Onde:** Todos os commands usam mix de `console.log()` direto e funções de `format.ts`.
-**Problema:** Inconsistência no output. Dificulta futura implementação de `--json` e `--quiet`.
-**Solução:** Rotear todo output por `format.ts`. Adicionar `output.write()` que respeita flags globais.
+### DEBT-002: `console.log` espalhado nos commands — ✅ resolvido em 1.3.0
+_Todos os `console.log/error/warn` em commands agora passam por `lib/format.ts` (funções tipadas + `output` namespace). Respeitam `setQuiet`/`setJsonMode` globais — preparado pra flags `--quiet` e `--json` futuras sem retrabalho em commands._
 
-### DEBT-003: Duplicação de lógica dry-run
-**Onde:** `init.ts`, `update.ts`, `remove.ts`
-**Problema:** Cada command reimplementa a lógica de dry-run com if/else. Muito boilerplate.
-**Solução:** Criar wrapper `dryRunnable(action, dryMessage)` ou middleware no Commander.
+### DEBT-003: Duplicação de lógica dry-run — ✅ resolvido em 1.3.0
+_Helper `dryRunnable(ctx, action, message)` em `lib/dry-run.ts`. Refatorado em `init`, `update` e `remove`. Novos commands dry-run-aware viram one-liner._
 
 ### DEBT-004: Sem validação do frontmatter ao instalar — ✅ resolvido em 1.2.0
 _Concluído na branch `feat/v1.2.0-bugs-bundles-hooks`. Validação compartilhada via `src/lib/validate-frontmatter.ts` agora roda em `init`, `update` e `create`._
@@ -352,11 +351,8 @@ _Concluído na branch `feat/v1.2.0-bugs-bundles-hooks`. Validação compartilhad
 **Problema:** Seguro hoje (registry hardcoded), mas se o registry virar dinâmico (FEAT-006), é injection direto.
 **Solução:** Sanitizar ou usar `spawn` com array de args em vez de `execSync` com string.
 
-### DEBT-006: Sem modo verbose/debug
-**Onde:** Global
-**Problema:** Quando algo dá errado, não tem como ver detalhes. O `doctor` ajuda, mas não cobre runtime.
-**Solução:** Flag `--verbose` ou env var `CLAUDIAO_DEBUG=1` que ativa logs detalhados em todos os commands.
-**Nota:** Escalado como FEAT-030 (promovido de debt para feature por impacto em adoção).
+### DEBT-006: Sem modo verbose/debug — ✅ resolvido em 1.3.0
+_Flag global `--verbose` (`-v`) + env var `CLAUDIAO_DEBUG=1` em `src/index.ts`. `debug()` do `lib/format.ts` emite `[debug]` em stderr só quando ativo. Catch blocks anotados logam pelo mesmo canal. Env var sempre vence pra facilitar CI/scripts._
 
 ### DEBT-007: Hook scripts sem testes de integração — ✅ resolvido em 1.2.0
 _Concluído junto com FEAT-028. Integration tests em `src/lib/__tests__/hook-scripts.integration.test.ts`._

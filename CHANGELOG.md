@@ -13,10 +13,21 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 - **Stop hook (`pr` category)**: novo hook que roda no evento `Stop` do Claude Code, lembrando `/pr-template` e `/security-checklist` ao finalizar sessão com edits. Detecta sessões só-leitura via `tool_use_count`, `has_edits` ou parsing de `transcript_path` e passa em silêncio quando não há o que lembrar. Fecha o loop do fluxo identificado na validação de 18/04/2026 — complementa os hooks `PreToolUse` que cobriam apenas a fase de edição.
 - `HookEvent` type em `src/lib/hooks.ts` inclui `Stop` além de `PreToolUse`/`PostToolUse`. `HookCategory.matcher` agora é `string | null` para permitir eventos sem matcher (como `Stop`).
+- **Modo verbose** via flag global `--verbose` (`-v`) ou env var `CLAUDIAO_DEBUG=1`. `debug()` em `src/lib/format.ts` emite `[debug]` lines em stderr explicando resolução de paths, catches silenciados e decisões de symlink. Env var sempre vence sobre `--verbose=false` pra facilitar CI/scripts.
+- Helper `dryRunnable(ctx, action, message)` em `src/lib/dry-run.ts`. Substitui os if/else duplicados de dry-run em `init`, `update` e `remove`.
+- `output` namespace em `src/lib/format.ts` expondo `info/success/warn/error/debug/raw/table/json/banner/dim/heading/separator`. Respeita `setQuiet` e `setJsonMode` — permite implementar `--quiet`/`--json` no futuro sem retocar cada command.
 
 ### Changed
 
 - `claudiao hooks list` e o diálogo de confirmação de `uninstall` exibem `(none)` para hooks sem matcher (antes mostravam string vazia).
+- Output dos commands roteado integralmente por `src/lib/format.ts` (sem `console.log` direto em `init`, `update`, `remove`, `list`, `doctor`, `hooks`, `install-plugin`, `create`). Comportamento visível inalterado.
+- Catch blocks silenciosos em `paths.ts`, `hooks.ts`, `symlinks.ts`, `init.ts`, `update.ts`, `list.ts`, `doctor.ts` e `install-plugin.ts` agora carregam comentário `// expected: <razão>` e (quando faz sentido) logam o erro via `debug()`.
+
+### Docs
+
+- Nova seção **"Troubleshooting"** no README mostrando como rodar com `--verbose`/`CLAUDIAO_DEBUG=1`.
+- Nova seção **"Relação com outros plugins do Claude Code"** no README clarificando que `superpowers`/`get-shit-done` são plugins separados do Claude Code, instalados via `claude /plugin install` — não bundled no pacote claudiao.
+- BACKLOG registra a decisão de adiar bundles opt-in (era FEAT-023) por falta de caso de uso concreto; será revisitado quando houver pelo menos 3 pedidos diferentes de usuários querendo empacotar conjuntos próprios de agents/skills.
 
 ## [1.2.1] — 2026-04-18
 
