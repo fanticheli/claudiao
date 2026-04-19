@@ -7,6 +7,17 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.3.0] — unreleased
+
+### Added
+
+- **Stop hook (`pr` category)**: novo hook que roda no evento `Stop` do Claude Code, lembrando `/pr-template` e `/security-checklist` ao finalizar sessão com edits. Detecta sessões só-leitura via `tool_use_count`, `has_edits` ou parsing de `transcript_path` e passa em silêncio quando não há o que lembrar. Fecha o loop do fluxo identificado na validação de 18/04/2026 — complementa os hooks `PreToolUse` que cobriam apenas a fase de edição.
+- `HookEvent` type em `src/lib/hooks.ts` inclui `Stop` além de `PreToolUse`/`PostToolUse`. `HookCategory.matcher` agora é `string | null` para permitir eventos sem matcher (como `Stop`).
+
+### Changed
+
+- `claudiao hooks list` e o diálogo de confirmação de `uninstall` exibem `(none)` para hooks sem matcher (antes mostravam string vazia).
+
 ## [1.2.1] — 2026-04-18
 
 ### Fixed
