@@ -15,6 +15,41 @@ export interface HookCategory {
   event: 'PreToolUse' | 'PostToolUse';
 }
 
+export interface ParsedOnlyFlag {
+  ok: true;
+  categories: HookCategory[];
+}
+export interface ParsedOnlyFlagError {
+  ok: false;
+  invalid: string[];
+}
+
+/**
+ * Parses the `--only a,b,c` CSV flag into a list of HookCategory objects.
+ * Trims, lowercases and de-dupes; unknown ids land in `invalid` so the
+ * caller can abort with a clear message. Shared by install and uninstall
+ * so the two stay in sync.
+ */
+export function parseOnlyFlag(raw: string): ParsedOnlyFlag | ParsedOnlyFlagError {
+  const requested = Array.from(
+    new Set(
+      raw
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+        .filter((s) => s.length > 0),
+    ),
+  );
+  const categories: HookCategory[] = [];
+  const invalid: string[] = [];
+  for (const id of requested) {
+    const cat = HOOK_CATEGORIES.find((c) => c.id === id);
+    if (cat) categories.push(cat);
+    else invalid.push(id);
+  }
+  if (invalid.length > 0) return { ok: false, invalid };
+  return { ok: true, categories };
+}
+
 export const HOOK_CATEGORIES: HookCategory[] = [
   {
     id: 'security',
@@ -35,9 +70,9 @@ export const HOOK_CATEGORIES: HookCategory[] = [
   {
     id: 'migration',
     name: 'Migration reminder',
-    description: 'Lembra patterns zero-downtime ao criar migrations SQL',
+    description: 'Lembra patterns zero-downtime ao criar ou editar migrations SQL',
     script: 'claudiao-migration-reminder.mjs',
-    matcher: 'Write',
+    matcher: 'Write|Edit',
     event: 'PreToolUse',
   },
   {
@@ -142,47 +177,133 @@ export function mergeHooksIntoSettings(categories: HookCategory[]): SettingsJson
     categories.flatMap((c) => [c.script, c.script.replace(/\.mjs$/, '.sh')]),
   );
 
-  for (const cat of categories) {
-    const command = join(HOOKS_DIR, cat.script);
-    const list = (settings.hooks[cat.event] ?? []) as HookMatcher[];
-
-    // Drop any legacy claudiao entry for this category before re-adding.
-    // Legacy = .sh from pre-1.2 or the same script we're about to write.
+  // Clean claudiao entries for the target categories once per event.
+  // Previously this was done inside the per-category loop, which meant
+  // iteration N+1 would filter out the entries iteration N had just
+  // written — losing every category except the last.
+  const eventsTouched = new Set(categories.map((c) => c.event));
+  for (const event of eventsTouched) {
+    const list = (settings.hooks[event] ?? []) as HookMatcher[];
     const cleaned: HookMatcher[] = [];
     for (const matcher of list) {
       const kept = matcher.hooks.filter((h) => {
         if (h.type !== 'command') return true;
         if (!isClaudiaoHook(h.command)) return true;
-        // remove if it belongs to this category (any extension)
         return !categoryScripts.has(h.command.split('/').pop() ?? '');
       });
       if (kept.length > 0) cleaned.push({ ...matcher, hooks: kept });
     }
+    settings.hooks[event] = cleaned;
+  }
 
-    const entry: HookMatcher = {
-      matcher: cat.matcher,
-      hooks: [{ type: 'command', command, timeout: 5 }],
-    };
+  for (const cat of categories) {
+    const command = join(HOOKS_DIR, cat.script);
+    const list = (settings.hooks[cat.event] ?? []) as HookMatcher[];
 
-    const existing = cleaned.find((m) => m.matcher === cat.matcher);
+    const existing = list.find((m) => m.matcher === cat.matcher);
     if (existing) {
       existing.hooks.push({ type: 'command', command, timeout: 5 });
     } else {
-      cleaned.push(entry);
+      list.push({
+        matcher: cat.matcher,
+        hooks: [{ type: 'command', command, timeout: 5 }],
+      });
     }
 
-    settings.hooks[cat.event] = cleaned;
+    settings.hooks[cat.event] = list;
   }
 
   return settings;
 }
 
 /**
- * Removes all claudiao-managed hooks from settings.json. Preserves other hooks.
+ * Fixes up claudiao hook entries whose `matcher` drifted from the
+ * current HOOK_CATEGORIES definition. Only touches entries that
+ * `isClaudiaoHook` recognizes — user/other-plugin hooks with the same
+ * matcher string are never moved. Used on `hooks install` to heal
+ * installs from earlier claudiao versions (e.g. 1.2.0 shipped the
+ * migration hook with matcher 'Write' instead of 'Write|Edit').
+ *
+ * Returns the number of claudiao hook entries whose matcher was
+ * rewritten to the current canonical value.
  */
-export function removeClaudiaoHooks(): { removedCount: number; categoriesRemoved: string[] } {
+export function migrateClaudiaoHookMatchers(): number {
+  const settings = readSettings();
+  if (!settings.hooks) return 0;
+
+  let migrated = 0;
+
+  for (const event of Object.keys(settings.hooks) as Array<keyof NonNullable<SettingsJson['hooks']>>) {
+    const list = settings.hooks[event];
+    if (!list) continue;
+
+    // Collect claudiao entries that are in the wrong matcher bucket.
+    type Move = { command: string; entry: HookEntry; target: HookCategory };
+    const moves: Move[] = [];
+
+    for (const matcher of list) {
+      for (const h of matcher.hooks) {
+        if (h.type !== 'command' || !isClaudiaoHook(h.command)) continue;
+        const cat = findCategoryByScript(h.command);
+        if (!cat) continue;
+        if (cat.event !== event) continue;
+        if ((matcher.matcher ?? '') !== cat.matcher) {
+          moves.push({ command: h.command, entry: h, target: cat });
+        }
+      }
+    }
+
+    if (moves.length === 0) continue;
+
+    // Drop the stale entries from their current matchers.
+    const moveCommands = new Set(moves.map((m) => m.command));
+    const filtered: HookMatcher[] = [];
+    for (const matcher of list) {
+      const kept = matcher.hooks.filter((h) => {
+        if (h.type !== 'command') return true;
+        return !moveCommands.has(h.command);
+      });
+      if (kept.length > 0) filtered.push({ ...matcher, hooks: kept });
+    }
+
+    // Re-insert under the canonical matcher.
+    for (const move of moves) {
+      const existing = filtered.find((m) => m.matcher === move.target.matcher);
+      if (existing) {
+        existing.hooks.push(move.entry);
+      } else {
+        filtered.push({ matcher: move.target.matcher, hooks: [move.entry] });
+      }
+      migrated++;
+    }
+
+    if (filtered.length > 0) {
+      settings.hooks[event] = filtered;
+    } else {
+      delete settings.hooks[event];
+    }
+  }
+
+  if (migrated > 0) {
+    if (settings.hooks && Object.keys(settings.hooks).length === 0) delete settings.hooks;
+    writeSettings(settings);
+  }
+
+  return migrated;
+}
+
+/**
+ * Removes claudiao-managed hooks from settings.json, preserving other
+ * hooks. If `onlyCategories` is provided, removes only those category
+ * ids; otherwise removes every claudiao hook.
+ */
+export function removeClaudiaoHooks(
+  onlyCategories?: string[],
+): { removedCount: number; categoriesRemoved: string[] } {
   const settings = readSettings();
   if (!settings.hooks) return { removedCount: 0, categoriesRemoved: [] };
+
+  const filterSet = onlyCategories && onlyCategories.length > 0 ? new Set(onlyCategories) : null;
 
   let removedCount = 0;
   const categoriesRemoved = new Set<string>();
@@ -195,13 +316,12 @@ export function removeClaudiaoHooks(): { removedCount: number; categoriesRemoved
 
     for (const m of list) {
       const kept = m.hooks.filter((h) => {
-        if (h.type === 'command' && isClaudiaoHook(h.command)) {
-          removedCount++;
-          const cat = findCategoryByScript(h.command);
-          if (cat) categoriesRemoved.add(cat.id);
-          return false;
-        }
-        return true;
+        if (h.type !== 'command' || !isClaudiaoHook(h.command)) return true;
+        const cat = findCategoryByScript(h.command);
+        if (filterSet && (!cat || !filterSet.has(cat.id))) return true;
+        removedCount++;
+        if (cat) categoriesRemoved.add(cat.id);
+        return false;
       });
 
       if (kept.length > 0) {

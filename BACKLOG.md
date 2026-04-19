@@ -5,6 +5,15 @@
 
 ---
 
+## ✅ Resolvido em 1.2.1
+
+> Hotfix de 18/04/2026 — regressões identificadas logo após publicar a 1.2.0. Branch `fix/v1.2.1-doctor-hooks-regression`.
+
+- **Regressão**: `claudiao doctor` reportava todos os symlinks válidos como quebrados porque `existsSync(readlinkSync(path))` resolve paths relativos contra `process.cwd()`. Checagem centralizada em `isSymlinkBroken` (`src/lib/symlinks.ts`).
+- **Regressão**: `claudiao hooks install --only a,b` ignorava a primeira categoria. `mergeHooksIntoSettings` rodava a limpeza dentro do loop por categoria e apagava as entradas escritas na iteração anterior.
+- **Regressão**: hook de migration usava matcher `Write` apenas; agora dispara em `Write|Edit`. Auto-migração silenciosa em `hooks install` via `migrateClaudiaoHookMatchers`.
+- **Gap**: `claudiao hooks uninstall --only <categorias>` adicionado para paridade com `install`.
+
 ## ✅ Resolvido em 1.2.0
 
 > Validados em sessão de 18/04/2026 e implementados na branch `feat/v1.2.0-bugs-bundles-hooks`. Commit range disponível via `git log v1.1.0..v1.2.0`.
@@ -215,6 +224,17 @@ _FEAT-021 e FEAT-022 foram concluídas em 1.1.0 — ver seção "✅ Resolvido" 
 - Custom domain opcional (claudiao.dev ou similar)
 **Estimativa:** fim de semana (12-16h)
 **Dependência:** FEAT-026 (conteúdo visual) pra reusar
+
+### FEAT-031: Bundles opt-in (re-priorizado para v1.3.0)
+**Contexto:** O nome da branch `feat/v1.2.0-bugs-bundles-hooks` deixa claro que bundles era um dos três tracks planejados para 1.2.0, mas a feature não foi entregue — só os bugs e os hooks saíram. Nada foi publicado no CHANGELOG ou README como "disponível", então não há desinformação externa, mas o item precisa de lar explícito.
+**Motivação:** Agrupar agents+skills relacionados (ex: bundle `backend-node` com `nodejs-specialist` + `security-checklist` + `pr-template`) facilita onboarding de novos times. Hoje o usuário precisa lembrar quais agentes combinam.
+**Escopo esperado:**
+- Conceito de bundle definido em YAML (nome, descrição, lista de agents/skills incluídos)
+- `claudiao install bundle <nome>` instala todos os itens do bundle
+- `claudiao list bundles` lista bundles disponíveis
+- 3-4 bundles iniciais: `backend-node`, `backend-python`, `frontend-react`, `platform-aws`
+- Interop com `list agents/skills`: flag que mostra a qual bundle cada item pertence
+**Prioridade:** P0 para v1.3.0.
 
 ### FEAT-030: Modo `--verbose` e `CLAUDIAO_DEBUG`
 **Descrição:** Flag global pra output detalhado em debugging.
