@@ -15,6 +15,41 @@ export interface HookCategory {
   event: 'PreToolUse' | 'PostToolUse';
 }
 
+export interface ParsedOnlyFlag {
+  ok: true;
+  categories: HookCategory[];
+}
+export interface ParsedOnlyFlagError {
+  ok: false;
+  invalid: string[];
+}
+
+/**
+ * Parses the `--only a,b,c` CSV flag into a list of HookCategory objects.
+ * Trims, lowercases and de-dupes; unknown ids land in `invalid` so the
+ * caller can abort with a clear message. Shared by install and uninstall
+ * so the two stay in sync.
+ */
+export function parseOnlyFlag(raw: string): ParsedOnlyFlag | ParsedOnlyFlagError {
+  const requested = Array.from(
+    new Set(
+      raw
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+        .filter((s) => s.length > 0),
+    ),
+  );
+  const categories: HookCategory[] = [];
+  const invalid: string[] = [];
+  for (const id of requested) {
+    const cat = HOOK_CATEGORIES.find((c) => c.id === id);
+    if (cat) categories.push(cat);
+    else invalid.push(id);
+  }
+  if (invalid.length > 0) return { ok: false, invalid };
+  return { ok: true, categories };
+}
+
 export const HOOK_CATEGORIES: HookCategory[] = [
   {
     id: 'security',
@@ -142,36 +177,40 @@ export function mergeHooksIntoSettings(categories: HookCategory[]): SettingsJson
     categories.flatMap((c) => [c.script, c.script.replace(/\.mjs$/, '.sh')]),
   );
 
-  for (const cat of categories) {
-    const command = join(HOOKS_DIR, cat.script);
-    const list = (settings.hooks[cat.event] ?? []) as HookMatcher[];
-
-    // Drop any legacy claudiao entry for this category before re-adding.
-    // Legacy = .sh from pre-1.2 or the same script we're about to write.
+  // Clean claudiao entries for the target categories once per event.
+  // Previously this was done inside the per-category loop, which meant
+  // iteration N+1 would filter out the entries iteration N had just
+  // written — losing every category except the last.
+  const eventsTouched = new Set(categories.map((c) => c.event));
+  for (const event of eventsTouched) {
+    const list = (settings.hooks[event] ?? []) as HookMatcher[];
     const cleaned: HookMatcher[] = [];
     for (const matcher of list) {
       const kept = matcher.hooks.filter((h) => {
         if (h.type !== 'command') return true;
         if (!isClaudiaoHook(h.command)) return true;
-        // remove if it belongs to this category (any extension)
         return !categoryScripts.has(h.command.split('/').pop() ?? '');
       });
       if (kept.length > 0) cleaned.push({ ...matcher, hooks: kept });
     }
+    settings.hooks[event] = cleaned;
+  }
 
-    const entry: HookMatcher = {
-      matcher: cat.matcher,
-      hooks: [{ type: 'command', command, timeout: 5 }],
-    };
+  for (const cat of categories) {
+    const command = join(HOOKS_DIR, cat.script);
+    const list = (settings.hooks[cat.event] ?? []) as HookMatcher[];
 
-    const existing = cleaned.find((m) => m.matcher === cat.matcher);
+    const existing = list.find((m) => m.matcher === cat.matcher);
     if (existing) {
       existing.hooks.push({ type: 'command', command, timeout: 5 });
     } else {
-      cleaned.push(entry);
+      list.push({
+        matcher: cat.matcher,
+        hooks: [{ type: 'command', command, timeout: 5 }],
+      });
     }
 
-    settings.hooks[cat.event] = cleaned;
+    settings.hooks[cat.event] = list;
   }
 
   return settings;

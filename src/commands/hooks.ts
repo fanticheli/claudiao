@@ -8,6 +8,7 @@ import {
   writeSettings,
   removeClaudiaoHooks,
   listInstalledHooks,
+  parseOnlyFlag,
   SETTINGS_FILE,
 } from '../lib/hooks.js';
 import { banner, success, warn, error, info, heading, dim, separator } from '../lib/format.js';
@@ -25,20 +26,17 @@ export async function installHooks(options?: { only?: string; dryRun?: boolean }
   // Resolve categorias a instalar
   let selected: HookCategory[];
   if (options?.only) {
-    const requested = options.only.split(',').map((s) => s.trim().toLowerCase());
-    const found: HookCategory[] = [];
-    const missing: string[] = [];
-    for (const id of requested) {
-      const cat = HOOK_CATEGORIES.find((c) => c.id === id);
-      if (cat) found.push(cat);
-      else missing.push(id);
-    }
-    if (missing.length > 0) {
-      error(`Categorias desconhecidas: ${missing.join(', ')}`);
+    const parsed = parseOnlyFlag(options.only);
+    if (!parsed.ok) {
+      error(`Categorias desconhecidas: ${parsed.invalid.join(', ')}`);
       dim(`Disponíveis: ${HOOK_CATEGORIES.map((c) => c.id).join(', ')}`);
       process.exit(1);
     }
-    selected = found;
+    if (parsed.categories.length === 0) {
+      error('Nenhuma categoria informada em --only.');
+      process.exit(1);
+    }
+    selected = parsed.categories;
   } else {
     // Interactive: multi-select
     console.log(chalk.dim('  Hooks lembram de invocar skills em momentos críticos.'));
