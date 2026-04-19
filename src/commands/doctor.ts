@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { execSync } from 'node:child_process';
 import chalk from 'chalk';
 import { CLAUDE_DIR, CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, CLAUDE_MD, CONFIG_FILE, getExternalRepoPath, getAgentsSource } from '../lib/paths.js';
-import { isSymlink, getSymlinkTarget } from '../lib/symlinks.js';
+import { isSymlink, getSymlinkTarget, isSymlinkBroken, resolveSymlinkTarget } from '../lib/symlinks.js';
 import { banner, success, warn, error, heading } from '../lib/format.js';
 import {
   validateAgentFrontmatter,
@@ -40,11 +40,11 @@ export function doctor(): void {
   // 3. CLAUDE.md global
   if (existsSync(CLAUDE_MD)) {
     if (isSymlink(CLAUDE_MD)) {
-      const target = getSymlinkTarget(CLAUDE_MD);
-      if (target && existsSync(target)) {
-        success(`CLAUDE.md global OK ${chalk.dim('→ ' + target)}`);
+      const rawTarget = getSymlinkTarget(CLAUDE_MD);
+      if (!isSymlinkBroken(CLAUDE_MD)) {
+        success(`CLAUDE.md global OK ${chalk.dim('→ ' + rawTarget)}`);
       } else {
-        error(`CLAUDE.md global: symlink quebrado → ${target}`);
+        error(`CLAUDE.md global: symlink quebrado → ${rawTarget}`);
         issues++;
       }
     } else {
@@ -63,12 +63,9 @@ export function doctor(): void {
 
     for (const agent of agents) {
       const agentPath = join(CLAUDE_AGENTS_DIR, agent);
-      if (isSymlink(agentPath)) {
-        const target = getSymlinkTarget(agentPath);
-        if (!target || !existsSync(target)) {
-          error(`Agente ${agent}: symlink quebrado → ${target}`);
-          broken++;
-        }
+      if (isSymlink(agentPath) && isSymlinkBroken(agentPath)) {
+        error(`Agente ${agent}: symlink quebrado → ${getSymlinkTarget(agentPath)}`);
+        broken++;
       }
     }
 
@@ -92,12 +89,10 @@ export function doctor(): void {
 
     for (const skill of skills) {
       const skillPath = join(CLAUDE_SKILLS_DIR, skill.name);
-      if (isSymlink(skillPath)) {
-        const target = getSymlinkTarget(skillPath);
-        if (!target || !existsSync(target)) {
-          error(`Skill ${skill.name}: symlink quebrado → ${target}`);
-          broken++;
-        }
+      if (isSymlink(skillPath) && isSymlinkBroken(skillPath)) {
+        error(`Skill ${skill.name}: symlink quebrado → ${getSymlinkTarget(skillPath)}`);
+        broken++;
+        continue;
       }
 
       const skillMd = join(skillPath, 'SKILL.md');
@@ -148,7 +143,7 @@ export function doctor(): void {
 
     for (const agent of agents) {
       const agentPath = join(CLAUDE_AGENTS_DIR, agent);
-      const realPath = isSymlink(agentPath) ? getSymlinkTarget(agentPath) : agentPath;
+      const realPath = isSymlink(agentPath) ? resolveSymlinkTarget(agentPath) : agentPath;
       if (!realPath || !existsSync(realPath)) continue;
 
       try {
