@@ -7,6 +7,29 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-04-19
+
+### Removed (BREAKING)
+
+- **`claudiao install plugin <nome>`** — substituído por stub de deprecação que imprime mensagem e sai com exit code 1. Use `claude /plugin install <nome>` (nativo do Claude Code).
+- **`claudiao list plugins`** — subcomando removido do parser. Use `claude /plugin list` (nativo do Claude Code).
+- **`src/lib/plugins.ts`** — registry hardcoded de plugins (`superpowers`, `get-shit-done`, `claude-mem`) removido. Interface `PluginInfo` também removida de `src/types.ts`.
+- **Prompt de plugins no `claudiao init`** — o init deixa de perguntar "quer instalar plugins da comunidade?". Setup foca em agents, skills, hooks e CLAUDE.md.
+
+### Migration
+
+Se você usava `claudiao install plugin superpowers`, substitua por:
+
+```bash
+claude /plugin install superpowers
+```
+
+Nenhuma outra feature foi afetada. Agents, skills, hooks e CLAUDE.md global continuam funcionando idênticos à v1.3.x.
+
+### Rationale
+
+Claude Code tem sistema próprio de plugins (`claude /plugin`) mantido pela Anthropic. Duplicar essa responsabilidade no claudião adicionava superfície de manutenção sem valor real — o registry hardcoded desatualizava a cada novo plugin da comunidade. Ver `BACKLOG.md` → "Gestão de plugins de terceiros — removido em v1.4.0".
+
 ## [1.3.2] — 2026-04-19
 
 ### Fixed
