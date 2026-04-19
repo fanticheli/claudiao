@@ -364,6 +364,20 @@ _Concluído junto com FEAT-028. Integration tests em `src/lib/__tests__/hook-scr
 
 ---
 
+## Decisões de escopo
+
+### Bundles opt-in — adiado indefinidamente (era FEAT-023 pra 1.3.0)
+
+Originalmente planejado pra v1.3.0 como forma de separar agents "core" do claudião de bundles de terceiros (ex: GSD). **Adiado** pelos seguintes motivos:
+
+1. **Premissa original estava errada:** GSD/superpowers é plugin separado do Claude Code (instalado via `claude /plugin install`), não bundled no claudião. Nunca houve "agents GSD" dentro do pacote claudião pra separar — os 17 agents `gsd-*` vêm do plugin `superpowers`/`get-shit-done` que o usuário instala independentemente. A documentação do README (seção "Relação com outros plugins do Claude Code") agora explicita isso.
+2. **Sem caso de uso concreto:** sem demanda real por bundles customizados, a infraestrutura de bundles (paths de resolução, comandos `install bundle`/`uninstall bundle`, coluna source em `list`, migração v1.2→v1.3) seria over-engineering — modelar um sistema de distribuição antes de ter demanda é anti-pragmático.
+3. **Arquitetura provavelmente diferente quando vier:** se houver demanda, a forma certa provavelmente é `install bundle <url-git>` (instalação de repo remoto de terceiros) em vez de templates bundled no pacote claudião. Isso inverte o modelo do que foi desenhado.
+
+**Revisitar quando:** houver pelo menos 3 pedidos diferentes de usuários querendo empacotar conjuntos próprios de agents/skills pra distribuição. Até lá, usuários com conjuntos próprios podem usar o recurso de `repoPath` em `.claudiao.json` (repo externo).
+
+---
+
 ## Go-to-Market — Adoção e Comunidade
 
 > Não são features de produto, mas são pré-requisito pra lib sair do "uso pessoal" e virar adotada. Fazer só depois de FEAT-023 a FEAT-028 (infraestrutura) porque não adianta divulgar algo que ainda não suporta contribuição externa.
