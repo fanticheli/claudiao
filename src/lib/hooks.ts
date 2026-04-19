@@ -70,9 +70,9 @@ export const HOOK_CATEGORIES: HookCategory[] = [
   {
     id: 'migration',
     name: 'Migration reminder',
-    description: 'Lembra patterns zero-downtime ao criar migrations SQL',
+    description: 'Lembra patterns zero-downtime ao criar ou editar migrations SQL',
     script: 'claudiao-migration-reminder.mjs',
-    matcher: 'Write',
+    matcher: 'Write|Edit',
     event: 'PreToolUse',
   },
   {
@@ -214,6 +214,82 @@ export function mergeHooksIntoSettings(categories: HookCategory[]): SettingsJson
   }
 
   return settings;
+}
+
+/**
+ * Fixes up claudiao hook entries whose `matcher` drifted from the
+ * current HOOK_CATEGORIES definition. Only touches entries that
+ * `isClaudiaoHook` recognizes — user/other-plugin hooks with the same
+ * matcher string are never moved. Used on `hooks install` to heal
+ * installs from earlier claudiao versions (e.g. 1.2.0 shipped the
+ * migration hook with matcher 'Write' instead of 'Write|Edit').
+ *
+ * Returns the number of claudiao hook entries whose matcher was
+ * rewritten to the current canonical value.
+ */
+export function migrateClaudiaoHookMatchers(): number {
+  const settings = readSettings();
+  if (!settings.hooks) return 0;
+
+  let migrated = 0;
+
+  for (const event of Object.keys(settings.hooks) as Array<keyof NonNullable<SettingsJson['hooks']>>) {
+    const list = settings.hooks[event];
+    if (!list) continue;
+
+    // Collect claudiao entries that are in the wrong matcher bucket.
+    type Move = { command: string; entry: HookEntry; target: HookCategory };
+    const moves: Move[] = [];
+
+    for (const matcher of list) {
+      for (const h of matcher.hooks) {
+        if (h.type !== 'command' || !isClaudiaoHook(h.command)) continue;
+        const cat = findCategoryByScript(h.command);
+        if (!cat) continue;
+        if (cat.event !== event) continue;
+        if ((matcher.matcher ?? '') !== cat.matcher) {
+          moves.push({ command: h.command, entry: h, target: cat });
+        }
+      }
+    }
+
+    if (moves.length === 0) continue;
+
+    // Drop the stale entries from their current matchers.
+    const moveCommands = new Set(moves.map((m) => m.command));
+    const filtered: HookMatcher[] = [];
+    for (const matcher of list) {
+      const kept = matcher.hooks.filter((h) => {
+        if (h.type !== 'command') return true;
+        return !moveCommands.has(h.command);
+      });
+      if (kept.length > 0) filtered.push({ ...matcher, hooks: kept });
+    }
+
+    // Re-insert under the canonical matcher.
+    for (const move of moves) {
+      const existing = filtered.find((m) => m.matcher === move.target.matcher);
+      if (existing) {
+        existing.hooks.push(move.entry);
+      } else {
+        filtered.push({ matcher: move.target.matcher, hooks: [move.entry] });
+      }
+      migrated++;
+    }
+
+    if (filtered.length > 0) {
+      settings.hooks[event] = filtered;
+    } else {
+      delete settings.hooks[event];
+    }
+  }
+
+  if (migrated > 0) {
+    if (settings.hooks && Object.keys(settings.hooks).length === 0) delete settings.hooks;
+    writeSettings(settings);
+  }
+
+  return migrated;
 }
 
 /**
