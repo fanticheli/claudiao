@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process';
 import chalk from 'chalk';
 import { getPlugin, PLUGINS } from '../lib/plugins.js';
-import { banner, success, error, heading, info, raw } from '../lib/format.js';
+import { banner, success, error, heading, info, raw, debug } from '../lib/format.js';
 
 export function installPlugin(name: string): void {
   banner();
@@ -30,10 +30,11 @@ export function installPlugin(name: string): void {
     execSync(plugin.installCommand, { stdio: 'inherit' });
     raw('');
     success(`${plugin.name} instalado!`);
-  } catch {
+  } catch (err) {
     raw('');
     error(`Falha ao instalar ${plugin.name}.`);
     info(`Tente manualmente: ${chalk.yellow(plugin.installCommand)}`);
+    debug(`${plugin.installCommand} failed: ${err instanceof Error ? err.message : String(err)}`);
   }
   raw('');
 }

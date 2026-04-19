@@ -15,7 +15,7 @@ import {
   hasErrors,
   hasWarnings,
 } from '../lib/validate-frontmatter.js';
-import { banner, success, warn, error, info, dim, heading, separator, raw } from '../lib/format.js';
+import { banner, success, warn, error, info, dim, heading, separator, raw, debug } from '../lib/format.js';
 import { PLUGINS } from '../lib/plugins.js';
 import { execSync } from 'node:child_process';
 
@@ -39,9 +39,11 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
     try {
       execSync('which claude', { stdio: 'pipe' });
       success('Claude Code encontrado');
-    } catch {
+    } catch (err) {
+      // expected: Claude Code is a peer install; we warn and keep going
       warn('Claude Code nao encontrado no PATH');
       dim('Instale com: npm install -g @anthropic-ai/claude-code');
+      debug(`which claude failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   } else {
     info('[dry-run] Verificaria se Claude Code esta no PATH');
@@ -98,8 +100,11 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
         try {
           const meta = parseAgentFile(source);
           info(`[dry-run] Linkaria agente: ${meta.name} ${chalk.dim('— ' + meta.description.slice(0, 60))}`);
-        } catch {
+        } catch (err) {
+          // expected: agent file may have malformed frontmatter in dry-run preview;
+          // fall back to filename so the preview still lists every file.
           info(`[dry-run] Linkaria agente: ${file.replace('.md', '')}`);
+          debug(`parseAgentFile(${file}) failed: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
       raw('');
@@ -138,7 +143,11 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
             raw(`  ${chalk.yellow('⏭')} ${meta.name} ${chalk.dim('— ja instalado')}`);
             skipped++;
           }
-        } catch {
+        } catch (err) {
+          // expected: parseAgentFile can fail on legit-but-weird frontmatter
+          // (validation already covers the disqualifying cases). Install
+          // anyway and count the outcome so the tally stays honest.
+          debug(`parseAgentFile(${file}) failed mid-install: ${err instanceof Error ? err.message : String(err)}`);
           const result = createSymlink(source, target);
           if (result.status !== 'skipped') installed++;
           else skipped++;
@@ -260,8 +269,9 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
           try {
             execSync(plugin.installCommand, { stdio: 'inherit' });
             success(`${plugin.name} instalado`);
-          } catch {
+          } catch (err) {
             error(`Falha ao instalar ${plugin.name}. Tente manualmente: ${plugin.installCommand}`);
+            debug(`${plugin.installCommand} failed: ${err instanceof Error ? err.message : String(err)}`);
           }
         }
       }
@@ -276,8 +286,10 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
     if (existsSync(CONFIG_FILE)) {
       try {
         existingConfig = JSON.parse(readFileSync(CONFIG_FILE, 'utf-8'));
-      } catch {
-        // ignore corrupt config
+      } catch (err) {
+        // expected: .claudiao.json can be hand-edited to invalid JSON; we
+        // rewrite it fresh below, preserving only the default repoPath.
+        debug(`ignored corrupt ${CONFIG_FILE}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 

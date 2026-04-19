@@ -4,7 +4,7 @@ import { execSync } from 'node:child_process';
 import chalk from 'chalk';
 import { CLAUDE_DIR, CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, CLAUDE_MD, CONFIG_FILE, getExternalRepoPath, getAgentsSource } from '../lib/paths.js';
 import { isSymlink, getSymlinkTarget, isSymlinkBroken, resolveSymlinkTarget } from '../lib/symlinks.js';
-import { banner, success, warn, error, heading, dim, raw } from '../lib/format.js';
+import { banner, success, warn, error, heading, dim, raw, debug } from '../lib/format.js';
 import {
   validateAgentFrontmatter,
   validateSkillFrontmatter,
@@ -22,9 +22,11 @@ export function doctor(): void {
   try {
     execSync('which claude', { stdio: 'pipe' });
     success('Claude Code instalado');
-  } catch {
+  } catch (err) {
+    // expected: Claude Code is a peer install
     warn('Claude Code nao encontrado no PATH');
     dim('Instale: npm install -g @anthropic-ai/claude-code');
+    debug(`which claude failed: ${err instanceof Error ? err.message : String(err)}`);
     issues++;
   }
 
