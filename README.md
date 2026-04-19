@@ -1,8 +1,8 @@
 # claudião
 
-CLI que instala e gerencia agentes, skills e plugins para o [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
+CLI que instala e gerencia agentes, skills, hooks e CLAUDE.md global para o [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
-> Seu Claude Code no próximo nível. **18 agentes + 9 skills + 3 plugins + CLAUDE.md global + wizard de criação + doctor** — tudo em um comando.
+> Seu Claude Code no próximo nível. **18 agentes + 9 skills + 5 hooks + statusline de contexto + CLAUDE.md global + wizard de criação + doctor** — tudo em um comando.
 
 ## Pra quem é isso?
 
@@ -23,10 +23,9 @@ O [Claude Code](https://docs.anthropic.com/en/docs/claude-code) é uma CLI da An
 | **Agentes** | 18 | Subagents que o Claude Code invoca automaticamente pelo contexto (ex: perguntou sobre AWS? o `aws-specialist` entra em ação) |
 | **Skills** | 9 | Slash commands com templates e checklists prontos (ex: `/security-checklist` antes de deploy) |
 | **CLAUDE.md global** | 1 | Regras universais de código, git workflow e referência a todos os agentes/skills — muda o comportamento do Claude Code em **todos** os seus projetos |
+| **Statusline de contexto** | 1 | Barra no rodapé do Claude Code mostrando dir, branch, modelo, % de contexto usado e custo acumulado da sessão |
 | **Wizard de criação** | — | Crie seus próprios agentes e skills com um wizard interativo |
 | **Doctor** | — | Diagnóstico automático de problemas de instalação |
-
-Além disso, o claudião facilita a instalação de **3 plugins de terceiros** (da comunidade, não mantidos por este projeto) pra TDD, planejamento e memória entre sessões.
 
 Tudo instalado via symlinks — edite os templates e as mudanças refletem instantaneamente no Claude Code, sem reinstalar. Funciona solo ou em time (com [repo compartilhado](#repo-externo-avançado)).
 
@@ -54,7 +53,6 @@ Isso instala tudo interativamente:
 1. **CLAUDE.md global** — regras universais em `~/.claude/CLAUDE.md`
 2. **18 agentes** — symlinks em `~/.claude/agents/`
 3. **9 skills** — symlinks em `~/.claude/skills/`
-4. **Plugins** — pergunta se quer instalar extras
 
 Depois, abra o Claude Code em qualquer projeto (`claude`) e os agentes já estão ativos. Não precisa fazer mais nada.
 
@@ -148,26 +146,15 @@ Na prática, isso significa que ao abrir `claude` em qualquer projeto, ele já s
 
 Se você já tem um `~/.claude/CLAUDE.md` próprio, o `claudiao init` pergunta antes de sobrescrever.
 
-## Usando plugins
+## Plugins do Claude Code
 
-Plugins são extensões **de terceiros**, mantidas pela comunidade (não pelo claudião). O claudião apenas facilita a instalação executando o comando correto pra cada plugin. Depois de instalado, o plugin funciona direto no Claude Code — o claudião não precisa estar rodando.
+A partir da v1.4.0, o claudião **não gerencia mais plugins de terceiros**. Pra instalar plugins como `superpowers`, `claude-mem` ou outros disponíveis no marketplace do Claude Code, use o comando nativo:
 
 ```bash
-# Instala via claudião (ele resolve o mecanismo certo pra cada plugin)
-claudiao install plugin superpowers     # usa: claude /plugin install superpowers
-claudiao install plugin get-shit-done   # usa: npx get-shit-done-cc@latest
-claudiao install plugin claude-mem      # usa: claude /plugin install claude-mem
-
-# Depois, no Claude Code (sem o claudião), o plugin já está ativo:
-você: "vamos fazer TDD nessa feature"
-       → superpowers entra em modo red-green-refactor automaticamente
+claude /plugin install <nome-do-plugin>
 ```
 
-| Plugin | Mecanismo de instalação | Como usar depois de instalar |
-|--------|------------------------|------------------------------|
-| **superpowers** | `claude /plugin install` | Pede TDD e ele força red-green-refactor. Pede debug e ele segue 4 fases sistemáticas. |
-| **get-shit-done** | `npx` (standalone) | Pede pra planejar uma feature e ele cria spec, divide em fases (discuss → plan → execute → verify) |
-| **claude-mem** | `claude /plugin install` | Memoriza decisões entre sessões automaticamente via SQLite + busca vetorial |
+Plugins e agents/skills/hooks do claudião coexistem pacificamente — cada um gerenciado pela sua ferramenta nativa. Veja a [documentação oficial de plugins](https://docs.claude.com/en/docs/claude-code/plugins).
 
 ## Comandos
 
@@ -206,18 +193,9 @@ O wizard gera o arquivo `.md` com frontmatter YAML diretamente em `~/.claude/age
 ```bash
 claudiao list agents       # Lista agentes instalados por categoria, com [core|external|local]
 claudiao list skills       # Lista skills (slash commands), com coluna de origem
-claudiao list plugins      # Lista plugins da comunidade disponíveis
 ```
 
 A coluna de origem (`core` / `external` / `local`) aparece a partir da v1.2.0 e ajuda a debugar quando um agent/skill vem do pacote bundled, do seu [repo externo](#repo-externo-avançado) ou foi criado manualmente.
-
-### Instalar plugins
-
-```bash
-claudiao install plugin superpowers      # TDD, debugging, code review
-claudiao install plugin get-shit-done    # Planejamento spec-driven
-claudiao install plugin claude-mem       # Memória entre sessões
-```
 
 ### Remover
 
@@ -244,6 +222,25 @@ claudiao hooks uninstall --only pr             # remove apenas uma categoria
 ```
 
 Os hooks editam `~/.claude/settings.json` fazendo merge (não overwrite) — hooks de outros plugins ficam intactos. Scripts ficam em `~/.claude/hooks/claudiao-*.mjs` e podem ser editados pra customizar as mensagens.
+
+### Statusline de contexto (v1.5.0+)
+
+Barra no rodapé do Claude Code com informação em tempo real da sessão: diretório, branch do git, modelo em uso, porcentagem de contexto consumida (verde <60%, amarelo 60-85%, vermelho >85%) e custo acumulado em USD.
+
+```
+📁 claudiao │ feat/v1.5.0-statusline │ Opus 4.7 (1M context) │ ██░░░░░░░░ 17% │ $11.46
+```
+
+Por que: quem usa Opus com 1M de contexto precisa saber quando a conversa tá chegando no limite — o claudião calcula baseado no campo `context_window.used_percentage` que o Claude Code envia.
+
+```bash
+claudiao statusline install           # instala (pergunta se já houver statusLine de outra origem)
+claudiao statusline install --force   # substitui sem perguntar
+claudiao statusline list              # mostra o que está configurado
+claudiao statusline uninstall         # remove só se foi o claudião que instalou
+```
+
+O script vive em `~/.claude/statusline/context-bar.mjs` (cópia do template bundled, igual aos hooks). Pode ser editado pra customizar o formato. `claudiao statusline uninstall` preserva statusLines de outras origens — só remove se detectar que o path pertence ao claudião.
 
 | Hook | Evento | Matcher | Quando lembra |
 |------|--------|---------|---------------|
@@ -291,16 +288,6 @@ Os hooks editam `~/.claude/settings.json` fazendo merge (não overwrite) — hoo
 | `/security-checklist` | Checklist pré-deploy com OWASP Top 10, headers, secrets, dependências |
 | `/sql-templates` | Templates SQL para diagnóstico de performance, migrations zero-downtime e indexes |
 | `/ui-review-checklist` | 30+ items de revisão de UI: hierarquia visual, acessibilidade, responsividade |
-
-## Plugins da comunidade
-
-> **Nota:** Estes plugins são projetos independentes, mantidos por seus respectivos autores. O claudião apenas facilita a instalação.
-
-| Plugin | O que faz |
-|--------|-----------|
-| [superpowers](https://github.com/obra/superpowers) | TDD enforced (red-green-refactor), debugging sistemático em 4 fases, code review, git worktrees |
-| [get-shit-done](https://github.com/gsd-build/get-shit-done) | Planejamento spec-driven com fases (discuss, plan, execute, verify) e estado persistido |
-| [claude-mem](https://github.com/thedotmack/claude-mem) | Memória persistente entre sessões via SQLite + busca vetorial |
 
 ## Relação com outros plugins do Claude Code
 
@@ -374,7 +361,7 @@ Se o problema não aparece no verbose, rode `claudiao doctor` — ele valida ins
 # 1. Instala a CLI
 npm install -g claudiao
 
-# 2. Setup (agentes + skills + CLAUDE.md + plugins)
+# 2. Setup (agentes + skills + CLAUDE.md global)
 claudiao init
 
 # 3. Abre o Claude Code em qualquer projeto
@@ -417,7 +404,7 @@ O guia cobre: setup de autenticação (SSO, OAuth), permissões recomendadas, 10
 O projeto inclui um **[guia completo de best practices](./templates/CLAUDE-CODE-BEST-PRACTICES.md)** com:
 
 - Workflows reais (feature nova, bug fix, code review, onboarding, deploy)
-- Como combinar agentes + skills + plugins num fluxo completo
+- Como combinar agentes + skills + hooks num fluxo completo
 - Níveis de raciocínio (think, megathink, ultrathink)
 - Subagents: quando usar e quando não usar
 - Dicas práticas (sessões paralelas, `/clear` entre tarefas, atalhos)
@@ -447,14 +434,10 @@ rm -f ~/.claude/.claudiao.json
 npm uninstall -g claudiao
 ```
 
-Plugins precisam ser removidos separadamente, cada um pelo seu mecanismo:
+Plugins do Claude Code (se tiver instalado algum via `claude /plugin install`) são removidos com o comando nativo:
 
 ```bash
-# Plugins instalados via claude /plugin install
-claude /plugin remove superpowers
-claude /plugin remove claude-mem
-
-# get-shit-done (instalado via npx) não requer remoção manual
+claude /plugin remove <nome-do-plugin>
 ```
 
 ## Licença

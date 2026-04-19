@@ -7,6 +7,40 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.5.0] — 2026-04-19
+
+Release com dois temas integrados: simplificação de escopo (remoção da gestão de plugins de terceiros) e nova feature de statusline.
+
+### Added
+
+- **Statusline de contexto** (`claudiao statusline install|uninstall|list`): novo script bundled (`templates/statusline/context-bar.mjs`) que renderiza barra no rodapé do Claude Code com diretório, branch do git, modelo em uso, percentual de contexto usado (verde <60%, amarelo 60-85%, vermelho >85%) e custo acumulado da sessão em USD. Lê `context_window.used_percentage` do schema do Claude Code 2.1.x, com fallback pra soma de `input + output + cache_creation + cache_read` sobre `context_window_size`.
+- Biblioteca `src/lib/statusline.ts` com helpers para instalar/remover/inspecionar a `statusLine` em `~/.claude/settings.json`. Segue o mesmo padrão dos hooks: copia o script pra `~/.claude/statusline/context-bar.mjs` e grava só `statusLine` no `settings.json` (preserva demais campos).
+- `claudiao init` passa a oferecer a statusline como opt-in (default `yes`) no fluxo interativo.
+- `claudiao doctor` reporta o estado da statusline (instalada pelo claudião, foreign, ou ausente).
+- 12 testes unitários em `src/lib/__tests__/statusline.test.ts` cobrindo detecção, cópia do script, merge em settings.json, e preservação de statusLine de outras origens no uninstall.
+
+### Removed (BREAKING)
+
+- **`claudiao install plugin <nome>`** — substituído por stub de deprecação que imprime mensagem e sai com exit code 1. Use `claude /plugin install <nome>` (nativo do Claude Code).
+- **`claudiao list plugins`** — subcomando removido do parser. Use `claude /plugin list` (nativo do Claude Code).
+- **`src/lib/plugins.ts`** — registry hardcoded de plugins (`superpowers`, `get-shit-done`, `claude-mem`) removido. Interface `PluginInfo` também removida de `src/types.ts`.
+- **Prompt de plugins no `claudiao init`** — o init deixa de perguntar "quer instalar plugins da comunidade?".
+
+### Migration
+
+Se você usava `claudiao install plugin superpowers`, substitua por:
+
+```bash
+claude /plugin install superpowers
+```
+
+Usuários upgrade-ando da 1.3.x podem optar pela statusline via `claudiao statusline install`. Nenhuma outra feature foi afetada. Agents, skills, hooks e CLAUDE.md global continuam funcionando idênticos à v1.3.x.
+
+### Rationale
+
+- **Remoção de plugins**: Claude Code tem sistema próprio de plugins (`claude /plugin`) mantido pela Anthropic. Duplicar essa responsabilidade no claudião adicionava superfície de manutenção sem valor real — o registry hardcoded desatualizava a cada novo plugin da comunidade.
+- **Statusline**: quem usa Opus 4.7 com 1M de contexto precisa saber quando a sessão tá se aproximando do limite. A statusLine do Claude Code é o ponto natural pra surfacear isso em tempo real. Ver `BACKLOG.md` → "Gestão de plugins de terceiros — removido em v1.5.0".
+
 ## [1.3.2] — 2026-04-19
 
 ### Fixed

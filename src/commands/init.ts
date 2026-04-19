@@ -17,7 +17,6 @@ import {
 } from '../lib/validate-frontmatter.js';
 import { banner, success, warn, error, info, dim, heading, separator, raw, debug } from '../lib/format.js';
 import { dryRunnable } from '../lib/dry-run.js';
-import { PLUGINS } from '../lib/plugins.js';
 import { execSync } from 'node:child_process';
 
 export async function init(options?: { dryRun?: boolean }): Promise<void> {
@@ -229,49 +228,32 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
     warn('Nenhuma skill encontrada. Use `claudiao create skill` pra criar.');
   }
 
-  // Ask about plugins
+  // Ask about statusline (opt-in, substitui só se user confirmar)
+  let statuslineInstalled = false;
   if (dryRun) {
     raw('');
-    info('[dry-run] Pulando prompts de plugins');
-    info('[dry-run] Plugins disponiveis: superpowers, get-shit-done, claude-mem');
+    info('[dry-run] Pulando prompt de statusline');
   } else {
     raw('');
-    const { installPlugins } = await inquirer.prompt([{
-      type: 'confirm',
-      name: 'installPlugins',
-      message: 'Quer instalar plugins da comunidade? (superpowers, get-shit-done, claude-mem)',
-      default: false,
-    }]);
+    const { wantStatusline } = await inquirer.prompt<{ wantStatusline: boolean }>([
+      {
+        type: 'confirm',
+        name: 'wantStatusline',
+        message: 'Instalar statusline do claudiao? (mostra dir, branch, modelo, % de contexto, custo)',
+        default: true,
+      },
+    ]);
 
-    if (installPlugins) {
-      heading('Plugins da Comunidade');
-
-      for (const plugin of PLUGINS) {
-        raw('');
-        raw(`  ${chalk.bold(plugin.name)} ${plugin.stars ? chalk.dim(`(${plugin.stars} stars)`) : ''}`);
-        dim(plugin.description);
-        dim(`Repo: ${plugin.repo}`);
-        raw('');
-
-        const { install } = await inquirer.prompt([{
-          type: 'confirm',
-          name: 'install',
-          message: `  Instalar ${plugin.name}?`,
-          default: false,
-        }]);
-
-        if (install) {
-          try {
-            execSync(plugin.installCommand, { stdio: 'inherit' });
-            success(`${plugin.name} instalado`);
-          } catch (err) {
-            // expected: plugin install can fail (network, auth, upstream
-            // repo). Surface a manual retry hint and continue — the loop
-            // still offers the remaining plugins.
-            error(`Falha ao instalar ${plugin.name}. Tente manualmente: ${plugin.installCommand}`);
-            debug(`${plugin.installCommand} failed: ${err instanceof Error ? err.message : String(err)}`);
-          }
-        }
+    if (wantStatusline) {
+      try {
+        const { installStatusline } = await import('./statusline.js');
+        await installStatusline({});
+        statuslineInstalled = true;
+      } catch (err) {
+        // expected: install can fail if settings.json is locked or template
+        // missing. Surface and continue — init still finishes with agents/skills.
+        error(`Falha ao instalar statusline: ${err instanceof Error ? err.message : String(err)}`);
+        debug(`statusline install failed: ${err instanceof Error ? err.stack : String(err)}`);
       }
     }
   }
@@ -309,6 +291,7 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
   if (globalMdSource) raw(`  ${chalk.green('✓')} CLAUDE.md global com regras e configuracoes`);
   if (agentCount > 0) raw(`  ${chalk.green('✓')} ${agentCount} agentes especializados`);
   if (skillCount > 0) raw(`  ${chalk.green('✓')} ${skillCount} skills / slash commands`);
+  if (statuslineInstalled) raw(`  ${chalk.green('✓')} Statusline de contexto no rodape do Claude Code`);
   raw('');
 
   raw(chalk.bold('  Proximos passos:'));
