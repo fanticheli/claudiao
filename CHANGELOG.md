@@ -7,6 +7,14 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.3.1] — 2026-04-19
+
+### Fixed
+
+- Include `CHANGELOG.md` and `BACKLOG.md` in the published npm tarball (missing from v1.3.0 tarball).
+- Exclude test files (`dist/**/__tests__/**`, `dist/**/*.test.*`) from the published package via a dedicated `tsconfig.build.json` used by `npm run build`.
+- Complete DEBT-001 coverage: all catch blocks in `install-plugin.ts`, `doctor.ts`, `init.ts` and `update.ts` now carry an explicit `// expected:` comment or active treatment (log/surface).
+
 ## [1.3.0] — 2026-04-19
 
 ### Added
