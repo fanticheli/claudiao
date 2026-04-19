@@ -1,43 +1,14 @@
-import { execSync } from 'node:child_process';
 import chalk from 'chalk';
-import { getPlugin, PLUGINS } from '../lib/plugins.js';
-import { banner, success, error, heading, info, raw, debug } from '../lib/format.js';
+import { output } from '../lib/format.js';
 
-export function installPlugin(name: string): void {
-  banner();
-
-  const plugin = getPlugin(name);
-
-  if (!plugin) {
-    error(`Plugin "${name}" nao encontrado.`);
-    raw('');
-    info('Plugins disponiveis:');
-    for (const p of PLUGINS) {
-      raw(`  ${chalk.cyan(p.name.padEnd(18))}${chalk.dim(p.description.slice(0, 60))}`);
-    }
-    raw('');
-    return;
-  }
-
-  heading(`Instalando ${plugin.name}...`);
-  raw(chalk.dim(`  ${plugin.description}`));
-  raw(chalk.dim(`  Repo: ${plugin.repo}`));
-  raw('');
-  raw(chalk.dim(`  Executando: ${plugin.installCommand}`));
-  raw('');
-
-  try {
-    execSync(plugin.installCommand, { stdio: 'inherit' });
-    raw('');
-    success(`${plugin.name} instalado!`);
-  } catch (err) {
-    // expected: execSync exits non-zero when plugin install fails (network,
-    // auth, plugin repo unavailable). Surface a friendly retry hint; the full
-    // stderr already streamed via stdio: 'inherit'.
-    raw('');
-    error(`Falha ao instalar ${plugin.name}.`);
-    info(`Tente manualmente: ${chalk.yellow(plugin.installCommand)}`);
-    debug(`${plugin.installCommand} failed: ${err instanceof Error ? err.message : String(err)}`);
-  }
-  raw('');
+export function installPlugin(_name?: string): void {
+  output.warn(`O comando 'claudiao install plugin' foi removido na v1.4.0.`);
+  output.raw('');
+  output.info('O claudiao agora foca apenas em gerenciar os próprios agents, skills e hooks.');
+  output.info('Pra instalar plugins do Claude Code (superpowers, claude-mem, etc.), use:');
+  output.raw('');
+  output.raw(`  ${chalk.cyan('claude /plugin install <nome-do-plugin>')}`);
+  output.raw('');
+  output.info('Documentação oficial: https://docs.claude.com/en/docs/claude-code/plugins');
+  process.exit(1);
 }

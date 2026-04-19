@@ -3,14 +3,15 @@
 import { Command } from 'commander';
 import { init } from './commands/init.js';
 import { createAgent, createSkill } from './commands/create.js';
-import { listAgents, listSkills, listPlugins } from './commands/list.js';
+import { listAgents, listSkills } from './commands/list.js';
 import { doctor } from './commands/doctor.js';
 import { removeAgent, removeSkill } from './commands/remove.js';
 import { update } from './commands/update.js';
 import { installPlugin } from './commands/install-plugin.js';
 import { installHooks, uninstallHooks, listHooks } from './commands/hooks.js';
+import { installStatusline, uninstallStatusline, listStatusline } from './commands/statusline.js';
 import { getPackageVersion } from './lib/package-info.js';
-import { setVerbose, debug, error } from './lib/format.js';
+import { setVerbose, debug } from './lib/format.js';
 
 const program = new Command();
 
@@ -78,7 +79,7 @@ Exemplos:
 // ============================================================
 const list = program
   .command('list')
-  .description('Lista agentes, skills ou plugins');
+  .description('Lista agentes ou skills instalados');
 
 list
   .command('agents')
@@ -94,33 +95,16 @@ list
     listSkills();
   });
 
-list
-  .command('plugins')
-  .description('Lista plugins da comunidade disponiveis')
-  .action(() => {
-    listPlugins();
-  });
-
 // ============================================================
 // install plugin
 // ============================================================
 program
   .command('install')
-  .description('Instala um plugin da comunidade')
-  .argument('<type>', 'Tipo: plugin')
-  .argument('<name>', 'Nome do plugin (superpowers, get-shit-done, claude-mem)')
-  .addHelpText('after', `
-Exemplos:
-  claudiao install plugin superpowers
-  claudiao install plugin get-shit-done
-  claudiao install plugin claude-mem
-  `)
-  .action((type: string, name: string) => {
-    if (type !== 'plugin') {
-      error(`Tipo "${type}" nao reconhecido. Use: claudiao install plugin <nome>`);
-      return;
-    }
-    installPlugin(name);
+  .description('[REMOVIDO v1.4.0] Use `claude /plugin install <nome>` (nativo do Claude Code)')
+  .argument('[type]', 'Tipo (ignorado — comando removido)')
+  .argument('[name]', 'Nome (ignorado — comando removido)')
+  .action((_type?: string, _name?: string) => {
+    installPlugin();
   });
 
 // ============================================================
@@ -210,6 +194,37 @@ hooks
   .description('Lista hooks do claudiao atualmente instalados')
   .action(() => {
     listHooks();
+  });
+
+// ============================================================
+// statusline
+// ============================================================
+const statusline = program
+  .command('statusline')
+  .description('Gerencia a statusline do claudiao (barra de contexto no rodape do Claude Code)');
+
+statusline
+  .command('install')
+  .description('Instala a statusline de contexto (mostra dir, branch, modelo, % de contexto, custo)')
+  .option('--force', 'Substitui statusLine existente de outra origem sem perguntar')
+  .option('--dry-run', 'Mostra o que seria feito sem executar')
+  .action(async (options: { force?: boolean; dryRun?: boolean }) => {
+    await installStatusline(options);
+  });
+
+statusline
+  .command('uninstall')
+  .description('Remove a statusline do claudiao (preserva statusLine de outras origens)')
+  .option('-y, --yes', 'Pula confirmacao interativa')
+  .action(async (options: { yes?: boolean }) => {
+    await uninstallStatusline(options);
+  });
+
+statusline
+  .command('list')
+  .description('Mostra a statusLine ativa e se foi instalada pelo claudiao')
+  .action(() => {
+    listStatusline();
   });
 
 // ============================================================

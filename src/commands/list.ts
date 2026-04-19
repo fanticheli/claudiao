@@ -5,7 +5,6 @@ import { CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, PACKAGE_ROOT } from '../lib/paths
 import { parseAgentFile, parseSkillFile } from '../lib/frontmatter.js';
 import { getInstallSource } from '../lib/symlinks.js';
 import { banner, heading, table, info, raw, debug } from '../lib/format.js';
-import { PLUGINS } from '../lib/plugins.js';
 
 export function listAgents(): void {
   banner();
@@ -136,21 +135,3 @@ export function listSkills(): void {
   raw('');
 }
 
-export function listPlugins(): void {
-  banner();
-  heading('Plugins da comunidade');
-
-  // Multi-part rendering: use raw() so quiet/json modes can suppress
-  // everything at once without touching each line.
-  raw(chalk.dim('  Ferramentas extras que complementam os agentes/skills.'));
-  raw(chalk.dim('  Instale com: claudiao install plugin <nome>'));
-  raw('');
-
-  for (const plugin of PLUGINS) {
-    raw(`  ${chalk.bold(plugin.name)} ${plugin.stars ? chalk.dim(`(${plugin.stars} stars)`) : ''}`);
-    raw(`  ${chalk.dim(plugin.description)}`);
-    raw(`  ${chalk.dim('Repo: ' + plugin.repo)}`);
-    raw(`  ${chalk.dim('Instalar: ' + plugin.installCommand)}`);
-    raw('');
-  }
-}
