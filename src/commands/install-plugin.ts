@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process';
 import chalk from 'chalk';
 import { getPlugin, PLUGINS } from '../lib/plugins.js';
-import { banner, success, error, heading, info } from '../lib/format.js';
+import { banner, success, error, heading, info, raw, debug } from '../lib/format.js';
 
 export function installPlugin(name: string): void {
   banner();
@@ -10,30 +10,31 @@ export function installPlugin(name: string): void {
 
   if (!plugin) {
     error(`Plugin "${name}" nao encontrado.`);
-    console.log('');
+    raw('');
     info('Plugins disponiveis:');
     for (const p of PLUGINS) {
-      console.log(`  ${chalk.cyan(p.name.padEnd(18))}${chalk.dim(p.description.slice(0, 60))}`);
+      raw(`  ${chalk.cyan(p.name.padEnd(18))}${chalk.dim(p.description.slice(0, 60))}`);
     }
-    console.log('');
+    raw('');
     return;
   }
 
   heading(`Instalando ${plugin.name}...`);
-  console.log(chalk.dim(`  ${plugin.description}`));
-  console.log(chalk.dim(`  Repo: ${plugin.repo}`));
-  console.log('');
-  console.log(chalk.dim(`  Executando: ${plugin.installCommand}`));
-  console.log('');
+  raw(chalk.dim(`  ${plugin.description}`));
+  raw(chalk.dim(`  Repo: ${plugin.repo}`));
+  raw('');
+  raw(chalk.dim(`  Executando: ${plugin.installCommand}`));
+  raw('');
 
   try {
     execSync(plugin.installCommand, { stdio: 'inherit' });
-    console.log('');
+    raw('');
     success(`${plugin.name} instalado!`);
-  } catch {
-    console.log('');
+  } catch (err) {
+    raw('');
     error(`Falha ao instalar ${plugin.name}.`);
     info(`Tente manualmente: ${chalk.yellow(plugin.installCommand)}`);
+    debug(`${plugin.installCommand} failed: ${err instanceof Error ? err.message : String(err)}`);
   }
-  console.log('');
+  raw('');
 }

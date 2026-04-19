@@ -228,23 +228,32 @@ claudiao remove skill deploy-checklist
 
 ### Hooks (lembretes de skill)
 
-Hooks são lembretes não-bloqueantes injetados pelo Claude Code em momentos-chave — editar endpoint lembra de `/security-checklist`, editar migration lembra de `/sql-templates`, etc. A partir da v1.2.0 os scripts são Node.js (`.mjs`), funcionam em Linux, macOS e Windows nativo sem dependências externas.
+Hooks são lembretes não-bloqueantes injetados pelo Claude Code em momentos-chave. Existem dois tipos complementares:
+
+- **Hooks `PreToolUse`** lembram **durante a edição**: editar endpoint lembra de `/security-checklist`, editar migration lembra de `/sql-templates`, etc.
+- **Hook `Stop`** (v1.3.0+) lembra **no fim da sessão**, fechando o loop: chama `/pr-template` e `/security-checklist` antes de abrir o PR, evitando esquecer de rodar as skills de fechamento.
+
+A partir da v1.2.0 os scripts são Node.js (`.mjs`) e funcionam em Linux, macOS e Windows nativo sem dependências externas.
 
 ```bash
-claudiao hooks install                    # seleção interativa dos 4 hooks bundled
-claudiao hooks install --only security    # instala apenas um tipo
-claudiao hooks list                       # mostra hooks ativos
-claudiao hooks uninstall                  # remove apenas os hooks do claudião, preserva outros
+claudiao hooks install                         # seleção interativa dos 5 hooks bundled
+claudiao hooks install --only security,pr      # instala apenas os categorias informadas
+claudiao hooks list                            # mostra hooks ativos
+claudiao hooks uninstall                       # remove apenas os hooks do claudião, preserva outros
+claudiao hooks uninstall --only pr             # remove apenas uma categoria
 ```
 
 Os hooks editam `~/.claude/settings.json` fazendo merge (não overwrite) — hooks de outros plugins ficam intactos. Scripts ficam em `~/.claude/hooks/claudiao-*.mjs` e podem ser editados pra customizar as mensagens.
 
-| Hook | Matcher | Quando lembra |
-|------|---------|---------------|
-| `security` | `Write\|Edit` em paths com `controller`, `route`, `handler`, `/api/`, `/auth/` | `/security-checklist` antes de declarar endpoint pronto |
-| `ui` | `Write\|Edit` em `.tsx/.jsx/.vue/.svelte` ou `components/pages/views` | `/ui-review-checklist` antes de abrir PR |
-| `migration` | `Write` em `migrations/`, `*.sql`, `alembic/versions`, `prisma/migrations` | Patterns zero-downtime de `/sql-templates` |
-| `commit` | `Bash` com `git commit -m "..."` | Valida formato conventional commits |
+| Hook | Evento | Matcher | Quando lembra |
+|------|--------|---------|---------------|
+| `security` | `PreToolUse` | `Write\|Edit` em paths com `controller`, `route`, `handler`, `/api/`, `/auth/` | `/security-checklist` antes de declarar endpoint pronto |
+| `ui` | `PreToolUse` | `Write\|Edit` em `.tsx/.jsx/.vue/.svelte` ou `components/pages/views` | `/ui-review-checklist` antes de abrir PR |
+| `migration` | `PreToolUse` | `Write\|Edit` em `migrations/`, `*.sql`, `alembic/versions`, `prisma/migrations` | Patterns zero-downtime de `/sql-templates` |
+| `commit` | `PreToolUse` | `Bash` com `git commit -m "..."` | Valida formato conventional commits |
+| `pr` | `Stop` | (sem matcher) | `/pr-template` + `/security-checklist` no fim de sessão com edits — fecha o loop do fluxo |
+
+**Por que o Stop hook existe:** a validação de 18/04/2026 mostrou que os hooks `PreToolUse` cobrem bem a fase de edição, mas o fechamento (rodar `/pr-template` e `/security-checklist` completo antes do PR) continuava sendo esquecido. O hook `pr` detecta sessões que tiveram edits (via `tool_use_count`, `has_edits` ou parsing do `transcript_path`) e injeta o lembrete; sessões só-leitura passam em silêncio.
 
 ## Agentes incluídos (18)
 
@@ -293,6 +302,26 @@ Os hooks editam `~/.claude/settings.json` fazendo merge (não overwrite) — hoo
 | [get-shit-done](https://github.com/gsd-build/get-shit-done) | Planejamento spec-driven com fases (discuss, plan, execute, verify) e estado persistido |
 | [claude-mem](https://github.com/thedotmack/claude-mem) | Memória persistente entre sessões via SQLite + busca vetorial |
 
+## Relação com outros plugins do Claude Code
+
+O claudião gerencia agents, skills, hooks e CLAUDE.md global dentro de `~/.claude/`. Esse diretório pode conter itens instalados por **outras fontes** — é importante entender o que o claudião gerencia e o que não.
+
+**Fontes que convivem em `~/.claude/`**:
+
+- **Plugins do Claude Code** (instalados via `claude /plugin install <nome>`) — ex: `superpowers`, `get-shit-done` (GSD), `claude-mem`. Esses plugins podem adicionar agents, hooks e skills em `~/.claude/` independente do claudião, com ciclo de vida próprio.
+- **Customizações manuais** do usuário — arquivos `.md` criados direto em `~/.claude/agents/` ou similar.
+- **Repo externo** configurado via `.claudiao.json` com `repoPath`.
+- **Core do claudião** — os 18 agents, 9 skills, 5 hooks e CLAUDE.md global bundled no pacote.
+
+**O que o claudião gerencia:** apenas os itens instalados pelo próprio claudião. São identificáveis por serem symlinks pros templates do pacote ou do repo externo configurado. A coluna `source` em `claudiao list agents/skills` (`[core|external|local]`) ajuda a distinguir.
+
+**O que o claudião NÃO gerencia:**
+
+- Agents e hooks instalados por plugins como `superpowers` ou `get-shit-done` — esses seguem o ciclo de vida do plugin. Use `claude /plugin` pra gerenciá-los.
+- Arquivos criados manualmente pelo usuário em `~/.claude/`.
+
+Se `claudiao doctor` reporta warnings em agents cujos nomes começam com `gsd-` ou similar, eles provavelmente vêm de um plugin instalado separadamente (não do claudião). Rode `claude /plugin list` pra ver plugins ativos do Claude Code.
+
 ## Repo externo (avançado)
 
 Se você mantém seus agentes/skills num repo Git separado, configure em `~/.claude/.claudiao.json`:
@@ -316,6 +345,28 @@ seu-repo/
 ```
 
 O claudião prioriza o repo externo sobre os templates bundled. `claudiao update` roda `git pull` + relink automaticamente. Isso é útil pra times que compartilham agentes/skills via Git.
+
+## Troubleshooting
+
+Se algum comando parece falhar sem dar detalhes (ex: `claudiao update` não linka nada novo, `claudiao init` pula um agente silenciosamente), rode com o flag `--verbose` pra ver decisões internas:
+
+```bash
+claudiao --verbose update          # decisões de path, symlinks, git pull
+claudiao -v doctor                 # checagens detalhadas
+CLAUDIAO_DEBUG=1 claudiao list     # via env var (útil em CI)
+```
+
+Saída em modo verbose (stderr, prefixo `[debug]`):
+
+```
+[debug] verbose mode ON (flag: --verbose)
+[debug] getExternalRepoPath: ignored unreadable /home/user/.claude/.claudiao.json (Unexpected end of JSON input)
+[debug] git pull error: fatal: not a git repository
+```
+
+O env var `CLAUDIAO_DEBUG=1` tem o mesmo efeito e sempre vence sobre `--verbose=false`, útil pra forçar logs em scripts CI sem mexer na invocação.
+
+Se o problema não aparece no verbose, rode `claudiao doctor` — ele valida instalação, symlinks quebrados e frontmatter de agents/skills.
 
 ## Fluxo completo: do zero ao uso
 

@@ -2,6 +2,7 @@ import { homedir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { debug } from './format.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -43,10 +44,18 @@ export function getExternalRepoPath(): string | null {
     try {
       const config = JSON.parse(readFileSync(CONFIG_FILE, 'utf-8'));
       if (config.repoPath && existsSync(join(config.repoPath, 'agents'))) {
+        debug(`getExternalRepoPath: resolved to ${config.repoPath}`);
         return config.repoPath;
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      // expected: CONFIG_FILE may contain partial/corrupt JSON when
+      // another tool rewrites it. Silent fall-through to bundled paths
+      // is the intended UX — only surface the reason in verbose mode.
+      debug(
+        `getExternalRepoPath: ignored unreadable ${CONFIG_FILE} (${
+          err instanceof Error ? err.message : String(err)
+        })`,
+      );
     }
   }
   return null;

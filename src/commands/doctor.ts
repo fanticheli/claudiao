@@ -4,7 +4,7 @@ import { execSync } from 'node:child_process';
 import chalk from 'chalk';
 import { CLAUDE_DIR, CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, CLAUDE_MD, CONFIG_FILE, getExternalRepoPath, getAgentsSource } from '../lib/paths.js';
 import { isSymlink, getSymlinkTarget, isSymlinkBroken, resolveSymlinkTarget } from '../lib/symlinks.js';
-import { banner, success, warn, error, heading } from '../lib/format.js';
+import { banner, success, warn, error, heading, dim, raw, debug } from '../lib/format.js';
 import {
   validateAgentFrontmatter,
   validateSkillFrontmatter,
@@ -22,9 +22,11 @@ export function doctor(): void {
   try {
     execSync('which claude', { stdio: 'pipe' });
     success('Claude Code instalado');
-  } catch {
+  } catch (err) {
+    // expected: Claude Code is a peer install
     warn('Claude Code nao encontrado no PATH');
-    console.log(chalk.dim('    Instale: npm install -g @anthropic-ai/claude-code'));
+    dim('Instale: npm install -g @anthropic-ai/claude-code');
+    debug(`which claude failed: ${err instanceof Error ? err.message : String(err)}`);
     issues++;
   }
 
@@ -33,7 +35,7 @@ export function doctor(): void {
     success('~/.claude/ existe');
   } else {
     error('~/.claude/ nao existe');
-    console.log(chalk.dim('    Rode: claudiao init'));
+    dim('Rode: claudiao init');
     issues++;
   }
 
@@ -52,7 +54,7 @@ export function doctor(): void {
     }
   } else {
     warn('CLAUDE.md global nao instalado');
-    console.log(chalk.dim('    Rode: claudiao init'));
+    dim('Rode: claudiao init');
     issues++;
   }
 
@@ -73,7 +75,7 @@ export function doctor(): void {
       success(`${agents.length} agentes instalados, todos OK`);
     } else {
       error(`${broken} agente(s) com symlink quebrado`);
-      console.log(chalk.dim('    Rode: claudiao init (para reinstalar)'));
+      dim('Rode: claudiao init (para reinstalar)');
       issues += broken;
     }
   } else {
@@ -171,7 +173,7 @@ export function doctor(): void {
       success('Frontmatter de todos os agentes OK');
     } else if (errorCount === 0) {
       if (warnCount > MAX_WARNINGS_SHOWN) {
-        console.log(chalk.dim(`    ... e mais ${warnCount - MAX_WARNINGS_SHOWN} agente(s) com avisos`));
+        dim(`... e mais ${warnCount - MAX_WARNINGS_SHOWN} agente(s) com avisos`);
       }
       warn(`${warnCount} agente(s) com avisos de frontmatter (não bloqueia, mas revise)`);
     }
@@ -215,18 +217,19 @@ export function doctor(): void {
       success('Frontmatter de todas as skills OK');
     } else if (errorCount === 0) {
       if (warnCount > MAX_WARNINGS_SHOWN) {
-        console.log(chalk.dim(`    ... e mais ${warnCount - MAX_WARNINGS_SHOWN} skill(s) com avisos`));
+        dim(`... e mais ${warnCount - MAX_WARNINGS_SHOWN} skill(s) com avisos`);
       }
       warn(`${warnCount} skill(s) com avisos de frontmatter`);
     }
   }
 
-  // Summary
-  console.log('');
+  // Summary (bold colored header preserved via raw — dim/success/warn all
+  // prefix content so we use raw to keep exact output)
+  raw('');
   if (issues === 0) {
-    console.log(chalk.green.bold('  Tudo certo! Nenhum problema encontrado.'));
+    raw(chalk.green.bold('  Tudo certo! Nenhum problema encontrado.'));
   } else {
-    console.log(chalk.yellow.bold(`  ${issues} problema(s) encontrado(s). Veja as sugestoes acima.`));
+    raw(chalk.yellow.bold(`  ${issues} problema(s) encontrado(s). Veja as sugestoes acima.`));
   }
-  console.log('');
+  raw('');
 }

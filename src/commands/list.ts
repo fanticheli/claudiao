@@ -4,7 +4,7 @@ import chalk from 'chalk';
 import { CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, PACKAGE_ROOT } from '../lib/paths.js';
 import { parseAgentFile, parseSkillFile } from '../lib/frontmatter.js';
 import { getInstallSource } from '../lib/symlinks.js';
-import { banner, heading, table, info } from '../lib/format.js';
+import { banner, heading, table, info, raw, debug } from '../lib/format.js';
 import { PLUGINS } from '../lib/plugins.js';
 
 export function listAgents(): void {
@@ -35,7 +35,10 @@ export function listAgents(): void {
         source,
         status: 'installed' as const,
       };
-    } catch {
+    } catch (err) {
+      // expected: malformed frontmatter — doctor surfaces the real issue.
+      // Keep the row visible so the user still sees the file exists.
+      debug(`list parseAgentFile(${file}) failed: ${err instanceof Error ? err.message : String(err)}`);
       return {
         name: file.replace('.md', ''),
         description: chalk.dim('(erro ao ler frontmatter)'),
@@ -75,14 +78,14 @@ export function listAgents(): void {
     const catRows = grouped.get(key);
     if (catRows && catRows.length > 0) {
       const label = CATEGORY_LABELS[key] || key.charAt(0).toUpperCase() + key.slice(1);
-      console.log(`  ${chalk.bold(label)}`);
+      raw(`  ${chalk.bold(label)}`);
       table(catRows);
-      console.log('');
+      raw('');
     }
   }
 
   info(`${files.length} agentes instalados no total`);
-  console.log('');
+  raw('');
 }
 
 export function listSkills(): void {
@@ -115,8 +118,10 @@ export function listSkills(): void {
           source,
         };
       }
-    } catch {
-      // fallthrough
+    } catch (err) {
+      // expected: malformed SKILL.md frontmatter — row still rendered
+      // below with an empty description so the skill remains visible.
+      debug(`list parseSkillFile(${skillFile}) failed: ${err instanceof Error ? err.message : String(err)}`);
     }
     return {
       name: '/' + d.name,
@@ -126,24 +131,26 @@ export function listSkills(): void {
   });
 
   table(rows);
-  console.log('');
+  raw('');
   info(`${dirs.length} skills instaladas. Use digitando o comando no Claude Code.`);
-  console.log('');
+  raw('');
 }
 
 export function listPlugins(): void {
   banner();
   heading('Plugins da comunidade');
 
-  console.log(chalk.dim('  Ferramentas extras que complementam os agentes/skills.'));
-  console.log(chalk.dim('  Instale com: claudiao install plugin <nome>'));
-  console.log('');
+  // Multi-part rendering: use raw() so quiet/json modes can suppress
+  // everything at once without touching each line.
+  raw(chalk.dim('  Ferramentas extras que complementam os agentes/skills.'));
+  raw(chalk.dim('  Instale com: claudiao install plugin <nome>'));
+  raw('');
 
   for (const plugin of PLUGINS) {
-    console.log(`  ${chalk.bold(plugin.name)} ${plugin.stars ? chalk.dim(`(${plugin.stars} stars)`) : ''}`);
-    console.log(`  ${chalk.dim(plugin.description)}`);
-    console.log(`  ${chalk.dim('Repo: ' + plugin.repo)}`);
-    console.log(`  ${chalk.dim('Instalar: ' + plugin.installCommand)}`);
-    console.log('');
+    raw(`  ${chalk.bold(plugin.name)} ${plugin.stars ? chalk.dim(`(${plugin.stars} stars)`) : ''}`);
+    raw(`  ${chalk.dim(plugin.description)}`);
+    raw(`  ${chalk.dim('Repo: ' + plugin.repo)}`);
+    raw(`  ${chalk.dim('Instalar: ' + plugin.installCommand)}`);
+    raw('');
   }
 }

@@ -28,6 +28,7 @@ beforeEach(() => {
     'claudiao-ui-reminder.mjs',
     'claudiao-migration-reminder.mjs',
     'claudiao-commit-reminder.mjs',
+    'claudiao-pr-reminder.mjs',
   ]) {
     writeFileSync(join(TEMPLATES_DIR, 'hooks', name), '#!/usr/bin/env node\n');
   }
@@ -73,12 +74,12 @@ describe('parseOnlyFlag', () => {
     expect(parsed.categories.map((c) => c.id)).toEqual(['ui', 'migration']);
   });
 
-  it('accepts all four categories', async () => {
+  it('accepts all five categories', async () => {
     const { parseOnlyFlag } = await importHooks();
-    const parsed = parseOnlyFlag('security,ui,migration,commit');
+    const parsed = parseOnlyFlag('security,ui,migration,commit,pr');
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
-    expect(parsed.categories.map((c) => c.id)).toEqual(['security', 'ui', 'migration', 'commit']);
+    expect(parsed.categories.map((c) => c.id)).toEqual(['security', 'ui', 'migration', 'commit', 'pr']);
   });
 
   it('reports unknown ids', async () => {
@@ -125,7 +126,7 @@ describe('mergeHooksIntoSettings — multi-category regression', () => {
     expect(commands.some((c) => c.includes('claudiao-migration-reminder.mjs'))).toBe(true);
   });
 
-  it('installs all four categories at once without loss', async () => {
+  it('installs all categories at once without loss', async () => {
     const paths = await import('../paths.js');
     // @ts-expect-error test override
     paths.CLAUDE_DIR = CLAUDE_DIR_OVERRIDE;
@@ -137,6 +138,7 @@ describe('mergeHooksIntoSettings — multi-category regression', () => {
     const saved = readSettings();
     const commands = [
       ...(saved.hooks?.PreToolUse ?? []).flatMap((m) => m.hooks.map((h) => h.command)),
+      ...(saved.hooks?.Stop ?? []).flatMap((m) => m.hooks.map((h) => h.command)),
     ];
     for (const cat of HOOK_CATEGORIES) {
       expect(commands.some((c) => c.includes(cat.script))).toBe(true);
