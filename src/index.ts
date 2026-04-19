@@ -10,13 +10,24 @@ import { update } from './commands/update.js';
 import { installPlugin } from './commands/install-plugin.js';
 import { installHooks, uninstallHooks, listHooks } from './commands/hooks.js';
 import { getPackageVersion } from './lib/package-info.js';
+import { setVerbose, debug } from './lib/format.js';
 
 const program = new Command();
 
 program
   .name('claudiao')
   .description('Seu Claude Code no próximo nível. Agentes, skills e plugins em um comando.')
-  .version(getPackageVersion());
+  .version(getPackageVersion())
+  .option('-v, --verbose', 'Mostra logs de diagnóstico ([debug]) pra depurar decisões internas')
+  .hook('preAction', (thisCommand) => {
+    const rootOpts = thisCommand.optsWithGlobals?.() ?? thisCommand.opts();
+    if (rootOpts.verbose) {
+      setVerbose(true);
+      debug(`verbose mode ON (flag: --verbose)`);
+    } else if (process.env.CLAUDIAO_DEBUG === '1' || process.env.CLAUDIAO_DEBUG === 'true') {
+      debug(`verbose mode ON (env: CLAUDIAO_DEBUG=${process.env.CLAUDIAO_DEBUG})`);
+    }
+  });
 
 // ============================================================
 // init
