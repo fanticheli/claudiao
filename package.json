@@ -29,7 +29,10 @@
   },
   "files": [
     "dist",
-    "templates"
+    "templates",
+    "README.md",
+    "CHANGELOG.md",
+    "BACKLOG.md"
   ],
   "dependencies": {
     "@sindresorhus/slugify": "^3.0.0",
