@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
+import { mkdtempSync, rmSync, writeFileSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { PACKAGE_ROOT } from '../paths.js';
 
 const HOOKS_DIR = join(PACKAGE_ROOT, 'templates', 'hooks');
@@ -152,5 +154,136 @@ describe('claudiao-commit-reminder.mjs', () => {
     });
     expect(result.status).toBe(0);
     expect(result.stdout.trim()).toBe('');
+  });
+});
+
+describe('claudiao-pr-reminder.mjs', () => {
+  const SCRIPT = 'claudiao-pr-reminder.mjs';
+
+  it('is executable', () => {
+    const mode = statSync(join(HOOKS_DIR, SCRIPT)).mode;
+    // Owner execute bit set
+    expect(mode & 0o100).toBe(0o100);
+  });
+
+  it('emits reminder when tool_use_count > 0', () => {
+    const { stdout, status } = runHook(SCRIPT, {
+      session_id: 'test',
+      hook_event_name: 'Stop',
+      tool_use_count: 5,
+    });
+    expect(status).toBe(0);
+    const parsed = JSON.parse(stdout) as {
+      continue: boolean;
+      hookSpecificOutput?: { hookEventName?: string; additionalContext?: string };
+    };
+    expect(parsed.continue).toBe(true);
+    expect(parsed.hookSpecificOutput?.hookEventName).toBe('Stop');
+    expect(parsed.hookSpecificOutput?.additionalContext).toContain('/pr-template');
+    expect(parsed.hookSpecificOutput?.additionalContext).toContain('/security-checklist');
+  });
+
+  it('is quiet (no additionalContext) when tool_use_count is 0', () => {
+    const { stdout, status } = runHook(SCRIPT, {
+      session_id: 'test',
+      hook_event_name: 'Stop',
+      tool_use_count: 0,
+    });
+    expect(status).toBe(0);
+    const parsed = JSON.parse(stdout) as {
+      continue: boolean;
+      hookSpecificOutput?: unknown;
+    };
+    expect(parsed.continue).toBe(true);
+    expect(parsed.hookSpecificOutput).toBeUndefined();
+  });
+
+  it('reminds when has_edits=true', () => {
+    const { stdout } = runHook(SCRIPT, { has_edits: true });
+    const parsed = JSON.parse(stdout) as {
+      hookSpecificOutput?: { additionalContext?: string };
+    };
+    expect(parsed.hookSpecificOutput?.additionalContext).toContain('/pr-template');
+  });
+
+  it('is quiet when has_edits=false', () => {
+    const { stdout } = runHook(SCRIPT, { has_edits: false });
+    const parsed = JSON.parse(stdout) as { hookSpecificOutput?: unknown };
+    expect(parsed.hookSpecificOutput).toBeUndefined();
+  });
+
+  it('degrades to remind when payload has no detectable signal', () => {
+    const { stdout } = runHook(SCRIPT, { session_id: 't', hook_event_name: 'Stop' });
+    const parsed = JSON.parse(stdout) as {
+      hookSpecificOutput?: { additionalContext?: string };
+    };
+    expect(parsed.hookSpecificOutput?.additionalContext).toContain('/pr-template');
+  });
+
+  it('does not crash on malformed stdin', () => {
+    const result = spawnSync('node', [join(HOOKS_DIR, SCRIPT)], {
+      input: '<<<not json>>>',
+      encoding: 'utf-8',
+    });
+    expect(result.status).toBe(0);
+    const parsed = JSON.parse(result.stdout) as { continue: boolean };
+    expect(parsed.continue).toBe(true);
+  });
+
+  it('parses transcript and reminds when Edit/Write tool_use is present', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'claudiao-pr-transcript-'));
+    const transcriptPath = join(tmp, 'transcript.jsonl');
+    const entries = [
+      { type: 'user', message: { content: 'hi' } },
+      {
+        type: 'assistant',
+        message: { content: [{ type: 'tool_use', name: 'Edit', input: {} }] },
+      },
+    ];
+    writeFileSync(transcriptPath, entries.map((e) => JSON.stringify(e)).join('\n'));
+
+    try {
+      const { stdout } = runHook(SCRIPT, { transcript_path: transcriptPath });
+      const parsed = JSON.parse(stdout) as {
+        hookSpecificOutput?: { additionalContext?: string };
+      };
+      expect(parsed.hookSpecificOutput?.additionalContext).toContain('/pr-template');
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it('parses transcript and stays quiet when only reads happened', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'claudiao-pr-transcript-'));
+    const transcriptPath = join(tmp, 'transcript.jsonl');
+    const entries = [
+      {
+        type: 'assistant',
+        message: { content: [{ type: 'tool_use', name: 'Read', input: {} }] },
+      },
+      {
+        type: 'assistant',
+        message: { content: [{ type: 'tool_use', name: 'Grep', input: {} }] },
+      },
+    ];
+    writeFileSync(transcriptPath, entries.map((e) => JSON.stringify(e)).join('\n'));
+
+    try {
+      const { stdout } = runHook(SCRIPT, { transcript_path: transcriptPath });
+      const parsed = JSON.parse(stdout) as { hookSpecificOutput?: unknown };
+      expect(parsed.hookSpecificOutput).toBeUndefined();
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it('degrades to remind when transcript_path is unreadable', () => {
+    const { stdout } = runHook(SCRIPT, {
+      transcript_path: '/nonexistent/path/should/not/exist.jsonl',
+    });
+    const parsed = JSON.parse(stdout) as {
+      hookSpecificOutput?: { additionalContext?: string };
+    };
+    expect(parsed.hookSpecificOutput?.additionalContext).toContain('/pr-template');
   });
 });
