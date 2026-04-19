@@ -228,6 +228,36 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
     warn('Nenhuma skill encontrada. Use `claudiao create skill` pra criar.');
   }
 
+  // Ask about statusline (opt-in, substitui só se user confirmar)
+  let statuslineInstalled = false;
+  if (dryRun) {
+    raw('');
+    info('[dry-run] Pulando prompt de statusline');
+  } else {
+    raw('');
+    const { wantStatusline } = await inquirer.prompt<{ wantStatusline: boolean }>([
+      {
+        type: 'confirm',
+        name: 'wantStatusline',
+        message: 'Instalar statusline do claudiao? (mostra dir, branch, modelo, % de contexto, custo)',
+        default: true,
+      },
+    ]);
+
+    if (wantStatusline) {
+      try {
+        const { installStatusline } = await import('./statusline.js');
+        await installStatusline({});
+        statuslineInstalled = true;
+      } catch (err) {
+        // expected: install can fail if settings.json is locked or template
+        // missing. Surface and continue — init still finishes with agents/skills.
+        error(`Falha ao instalar statusline: ${err instanceof Error ? err.message : String(err)}`);
+        debug(`statusline install failed: ${err instanceof Error ? err.stack : String(err)}`);
+      }
+    }
+  }
+
   // Save config — preserve existing repoPath if current source is unavailable
   if (dryRun) {
     info('[dry-run] Salvaria configuracao em .claudiao.json');
@@ -261,6 +291,7 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
   if (globalMdSource) raw(`  ${chalk.green('✓')} CLAUDE.md global com regras e configuracoes`);
   if (agentCount > 0) raw(`  ${chalk.green('✓')} ${agentCount} agentes especializados`);
   if (skillCount > 0) raw(`  ${chalk.green('✓')} ${skillCount} skills / slash commands`);
+  if (statuslineInstalled) raw(`  ${chalk.green('✓')} Statusline de contexto no rodape do Claude Code`);
   raw('');
 
   raw(chalk.bold('  Proximos passos:'));

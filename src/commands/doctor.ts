@@ -11,6 +11,11 @@ import {
   hasErrors,
   hasWarnings,
 } from '../lib/validate-frontmatter.js';
+import {
+  STATUSLINE_DEST,
+  isClaudiaoStatusline,
+  getInstalledStatusline,
+} from '../lib/statusline.js';
 
 export function doctor(): void {
   banner();
@@ -225,6 +230,23 @@ export function doctor(): void {
       }
       warn(`${warnCount} skill(s) com avisos de frontmatter`);
     }
+  }
+
+  // 10. Statusline
+  const statuslineEntry = getInstalledStatusline();
+  if (!statuslineEntry) {
+    dim('Statusline nao configurada (opcional).');
+    dim('Instale com: claudiao statusline install');
+  } else if (isClaudiaoStatusline(statuslineEntry.command)) {
+    if (existsSync(STATUSLINE_DEST)) {
+      success('Statusline do claudiao OK');
+    } else {
+      error(`Statusline registrada em settings.json mas script nao existe em ${STATUSLINE_DEST}`);
+      dim('Rode: claudiao statusline install');
+      issues++;
+    }
+  } else {
+    dim(`Statusline ativa (nao gerenciada pelo claudiao): ${statuslineEntry.command}`);
   }
 
   // Summary (bold colored header preserved via raw — dim/success/warn all
