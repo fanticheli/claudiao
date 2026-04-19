@@ -10,7 +10,7 @@ import { update } from './commands/update.js';
 import { installPlugin } from './commands/install-plugin.js';
 import { installHooks, uninstallHooks, listHooks } from './commands/hooks.js';
 import { getPackageVersion } from './lib/package-info.js';
-import { setVerbose, debug, error } from './lib/format.js';
+import { setVerbose, debug } from './lib/format.js';
 
 const program = new Command();
 
@@ -106,21 +106,11 @@ list
 // ============================================================
 program
   .command('install')
-  .description('Instala um plugin da comunidade')
-  .argument('<type>', 'Tipo: plugin')
-  .argument('<name>', 'Nome do plugin (superpowers, get-shit-done, claude-mem)')
-  .addHelpText('after', `
-Exemplos:
-  claudiao install plugin superpowers
-  claudiao install plugin get-shit-done
-  claudiao install plugin claude-mem
-  `)
-  .action((type: string, name: string) => {
-    if (type !== 'plugin') {
-      error(`Tipo "${type}" nao reconhecido. Use: claudiao install plugin <nome>`);
-      return;
-    }
-    installPlugin(name);
+  .description('[REMOVIDO v1.4.0] Use `claude /plugin install <nome>` (nativo do Claude Code)')
+  .argument('[type]', 'Tipo (ignorado — comando removido)')
+  .argument('[name]', 'Nome (ignorado — comando removido)')
+  .action((_type?: string, _name?: string) => {
+    installPlugin();
   });
 
 // ============================================================
