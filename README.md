@@ -228,23 +228,32 @@ claudiao remove skill deploy-checklist
 
 ### Hooks (lembretes de skill)
 
-Hooks são lembretes não-bloqueantes injetados pelo Claude Code em momentos-chave — editar endpoint lembra de `/security-checklist`, editar migration lembra de `/sql-templates`, etc. A partir da v1.2.0 os scripts são Node.js (`.mjs`), funcionam em Linux, macOS e Windows nativo sem dependências externas.
+Hooks são lembretes não-bloqueantes injetados pelo Claude Code em momentos-chave. Existem dois tipos complementares:
+
+- **Hooks `PreToolUse`** lembram **durante a edição**: editar endpoint lembra de `/security-checklist`, editar migration lembra de `/sql-templates`, etc.
+- **Hook `Stop`** (v1.3.0+) lembra **no fim da sessão**, fechando o loop: chama `/pr-template` e `/security-checklist` antes de abrir o PR, evitando esquecer de rodar as skills de fechamento.
+
+A partir da v1.2.0 os scripts são Node.js (`.mjs`) e funcionam em Linux, macOS e Windows nativo sem dependências externas.
 
 ```bash
-claudiao hooks install                    # seleção interativa dos 4 hooks bundled
-claudiao hooks install --only security    # instala apenas um tipo
-claudiao hooks list                       # mostra hooks ativos
-claudiao hooks uninstall                  # remove apenas os hooks do claudião, preserva outros
+claudiao hooks install                         # seleção interativa dos 5 hooks bundled
+claudiao hooks install --only security,pr      # instala apenas os categorias informadas
+claudiao hooks list                            # mostra hooks ativos
+claudiao hooks uninstall                       # remove apenas os hooks do claudião, preserva outros
+claudiao hooks uninstall --only pr             # remove apenas uma categoria
 ```
 
 Os hooks editam `~/.claude/settings.json` fazendo merge (não overwrite) — hooks de outros plugins ficam intactos. Scripts ficam em `~/.claude/hooks/claudiao-*.mjs` e podem ser editados pra customizar as mensagens.
 
-| Hook | Matcher | Quando lembra |
-|------|---------|---------------|
-| `security` | `Write\|Edit` em paths com `controller`, `route`, `handler`, `/api/`, `/auth/` | `/security-checklist` antes de declarar endpoint pronto |
-| `ui` | `Write\|Edit` em `.tsx/.jsx/.vue/.svelte` ou `components/pages/views` | `/ui-review-checklist` antes de abrir PR |
-| `migration` | `Write` em `migrations/`, `*.sql`, `alembic/versions`, `prisma/migrations` | Patterns zero-downtime de `/sql-templates` |
-| `commit` | `Bash` com `git commit -m "..."` | Valida formato conventional commits |
+| Hook | Evento | Matcher | Quando lembra |
+|------|--------|---------|---------------|
+| `security` | `PreToolUse` | `Write\|Edit` em paths com `controller`, `route`, `handler`, `/api/`, `/auth/` | `/security-checklist` antes de declarar endpoint pronto |
+| `ui` | `PreToolUse` | `Write\|Edit` em `.tsx/.jsx/.vue/.svelte` ou `components/pages/views` | `/ui-review-checklist` antes de abrir PR |
+| `migration` | `PreToolUse` | `Write\|Edit` em `migrations/`, `*.sql`, `alembic/versions`, `prisma/migrations` | Patterns zero-downtime de `/sql-templates` |
+| `commit` | `PreToolUse` | `Bash` com `git commit -m "..."` | Valida formato conventional commits |
+| `pr` | `Stop` | (sem matcher) | `/pr-template` + `/security-checklist` no fim de sessão com edits — fecha o loop do fluxo |
+
+**Por que o Stop hook existe:** a validação de 18/04/2026 mostrou que os hooks `PreToolUse` cobrem bem a fase de edição, mas o fechamento (rodar `/pr-template` e `/security-checklist` completo antes do PR) continuava sendo esquecido. O hook `pr` detecta sessões que tiveram edits (via `tool_use_count`, `has_edits` ou parsing do `transcript_path`) e injeta o lembrete; sessões só-leitura passam em silêncio.
 
 ## Agentes incluídos (18)
 

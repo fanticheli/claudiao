@@ -5,6 +5,12 @@
 
 ---
 
+## ✅ Resolvido em 1.3.0
+
+> Entregue na branch `feat/v1.3.0-stop-hook-techdebt`. Foco em fechamento de loop (Stop hook) e consolidação de tech debt.
+
+- **Fechamento do loop do fluxo**: novo Stop hook (`pr`) lembra `/pr-template` e `/security-checklist` ao finalizar sessão com edits. Detecta sessões só-leitura via `tool_use_count`, `has_edits` ou parsing de `transcript_path` e passa em silêncio. Complementa FEAT-021 (hooks `PreToolUse` de edição) fechando o gap identificado na validação de 18/04/2026.
+
 ## ✅ Resolvido em 1.2.1
 
 > Hotfix de 18/04/2026 — regressões identificadas logo após publicar a 1.2.0. Branch `fix/v1.2.1-doctor-hooks-regression`.
