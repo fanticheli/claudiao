@@ -15,7 +15,8 @@ import {
   hasErrors,
   hasWarnings,
 } from '../lib/validate-frontmatter.js';
-import { banner, success, warn, error, info, dim, heading, separator } from '../lib/format.js';
+import { banner, success, warn, error, info, dim, heading, separator, raw, debug } from '../lib/format.js';
+import { dryRunnable } from '../lib/dry-run.js';
 import { PLUGINS } from '../lib/plugins.js';
 import { execSync } from 'node:child_process';
 
@@ -26,7 +27,7 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
 
   if (dryRun) {
     info('[dry-run] Nenhuma alteracao sera feita');
-    console.log('');
+    raw('');
   }
 
   // Check prerequisites
@@ -39,9 +40,11 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
     try {
       execSync('which claude', { stdio: 'pipe' });
       success('Claude Code encontrado');
-    } catch {
+    } catch (err) {
+      // expected: Claude Code is a peer install; we warn and keep going
       warn('Claude Code nao encontrado no PATH');
       dim('Instale com: npm install -g @anthropic-ai/claude-code');
+      debug(`which claude failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   } else {
     info('[dry-run] Verificaria se Claude Code esta no PATH');
@@ -53,28 +56,22 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
   const globalMdSource = getGlobalMdSource();
 
   // Create ~/.claude/
-  if (!dryRun) {
-    ensureDir(CLAUDE_DIR);
-  } else {
-    info('[dry-run] Criaria diretorio ~/.claude/ (se nao existir)');
-  }
+  dryRunnable({ dryRun }, () => ensureDir(CLAUDE_DIR), 'Criaria diretorio ~/.claude/ (se nao existir)');
 
   // [1/3] Install CLAUDE.md global
   heading('[1/3] CLAUDE.md Global');
   dim('Regras universais de codigo, git workflow, lista de agentes/skills');
-  console.log('');
+  raw('');
 
   if (globalMdSource) {
-    if (dryRun) {
-      info(`[dry-run] Linkaria ${globalMdSource} -> ~/.claude/CLAUDE.md`);
-    } else {
+    dryRunnable({ dryRun }, () => {
       const result = createSymlink(globalMdSource, CLAUDE_MD);
       if (result.status === 'created' || result.status === 'backup') {
         success('~/.claude/CLAUDE.md instalado');
       } else if (result.status === 'skipped') {
         info('CLAUDE.md ja estava instalado');
       }
-    }
+    }, `Linkaria ${globalMdSource} -> ~/.claude/CLAUDE.md`);
   } else {
     warn('global-CLAUDE.md nao encontrado');
   }
@@ -82,7 +79,7 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
   // [2/3] Install agents
   heading('[2/3] Agentes');
   dim('Especialistas que o Claude Code invoca automaticamente pelo contexto');
-  console.log('');
+  raw('');
 
   let agentCount = 0;
   if (agentsSource && existsSync(agentsSource)) {
@@ -98,11 +95,14 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
         try {
           const meta = parseAgentFile(source);
           info(`[dry-run] Linkaria agente: ${meta.name} ${chalk.dim('— ' + meta.description.slice(0, 60))}`);
-        } catch {
+        } catch (err) {
+          // expected: agent file may have malformed frontmatter in dry-run preview;
+          // fall back to filename so the preview still lists every file.
           info(`[dry-run] Linkaria agente: ${file.replace('.md', '')}`);
+          debug(`parseAgentFile(${file}) failed: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
-      console.log('');
+      raw('');
       info(`[dry-run] ${agentCount} agentes seriam processados`);
     } else {
       let installed = 0;
@@ -135,17 +135,21 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
             }
             installed++;
           } else {
-            console.log(`  ${chalk.yellow('⏭')} ${meta.name} ${chalk.dim('— ja instalado')}`);
+            raw(`  ${chalk.yellow('⏭')} ${meta.name} ${chalk.dim('— ja instalado')}`);
             skipped++;
           }
-        } catch {
+        } catch (err) {
+          // expected: parseAgentFile can fail on legit-but-weird frontmatter
+          // (validation already covers the disqualifying cases). Install
+          // anyway and count the outcome so the tally stays honest.
+          debug(`parseAgentFile(${file}) failed mid-install: ${err instanceof Error ? err.message : String(err)}`);
           const result = createSymlink(source, target);
           if (result.status !== 'skipped') installed++;
           else skipped++;
         }
       }
 
-      console.log('');
+      raw('');
       const parts = [
         `${chalk.green(String(installed) + ' novos')}`,
         `${chalk.dim(String(skipped) + ' ja existiam')}`,
@@ -160,7 +164,7 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
   // [3/3] Install skills
   heading('[3/3] Skills');
   dim('Slash commands com templates prontos (ex: /pr-template, /security-checklist)');
-  console.log('');
+  raw('');
 
   let skillCount = 0;
   if (skillsSource && existsSync(skillsSource)) {
@@ -176,7 +180,7 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
       for (const dir of skillDirs) {
         info(`[dry-run] Linkaria skill: /${dir}`);
       }
-      console.log('');
+      raw('');
       info(`[dry-run] ${skillCount} skills seriam processadas`);
     } else {
       let installed = 0;
@@ -208,12 +212,12 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
           success(`/${dir}`);
           installed++;
         } else {
-          console.log(`  ${chalk.yellow('⏭')} /${dir} ${chalk.dim('— ja instalada')}`);
+          raw(`  ${chalk.yellow('⏭')} /${dir} ${chalk.dim('— ja instalada')}`);
           skipped++;
         }
       }
 
-      console.log('');
+      raw('');
       const parts = [
         `${chalk.green(String(installed) + ' novas')}`,
         `${chalk.dim(String(skipped) + ' ja existiam')}`,
@@ -227,11 +231,11 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
 
   // Ask about plugins
   if (dryRun) {
-    console.log('');
+    raw('');
     info('[dry-run] Pulando prompts de plugins');
     info('[dry-run] Plugins disponiveis: superpowers, get-shit-done, claude-mem');
   } else {
-    console.log('');
+    raw('');
     const { installPlugins } = await inquirer.prompt([{
       type: 'confirm',
       name: 'installPlugins',
@@ -243,11 +247,11 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
       heading('Plugins da Comunidade');
 
       for (const plugin of PLUGINS) {
-        console.log('');
-        console.log(`  ${chalk.bold(plugin.name)} ${plugin.stars ? chalk.dim(`(${plugin.stars} stars)`) : ''}`);
+        raw('');
+        raw(`  ${chalk.bold(plugin.name)} ${plugin.stars ? chalk.dim(`(${plugin.stars} stars)`) : ''}`);
         dim(plugin.description);
         dim(`Repo: ${plugin.repo}`);
-        console.log('');
+        raw('');
 
         const { install } = await inquirer.prompt([{
           type: 'confirm',
@@ -260,8 +264,9 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
           try {
             execSync(plugin.installCommand, { stdio: 'inherit' });
             success(`${plugin.name} instalado`);
-          } catch {
+          } catch (err) {
             error(`Falha ao instalar ${plugin.name}. Tente manualmente: ${plugin.installCommand}`);
+            debug(`${plugin.installCommand} failed: ${err instanceof Error ? err.message : String(err)}`);
           }
         }
       }
@@ -276,8 +281,10 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
     if (existsSync(CONFIG_FILE)) {
       try {
         existingConfig = JSON.parse(readFileSync(CONFIG_FILE, 'utf-8'));
-      } catch {
-        // ignore corrupt config
+      } catch (err) {
+        // expected: .claudiao.json can be hand-edited to invalid JSON; we
+        // rewrite it fresh below, preserving only the default repoPath.
+        debug(`ignored corrupt ${CONFIG_FILE}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
@@ -289,28 +296,29 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
     writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
   }
 
-  // Summary
+  // Summary — all composite formatted lines routed through raw() so quiet
+  // mode can hush the block at once.
   separator();
-  console.log(chalk.green.bold('  Pronto! claudiao configurado.'));
+  raw(chalk.green.bold('  Pronto! claudiao configurado.'));
   separator();
 
-  console.log(chalk.bold('  O que foi instalado:'));
-  if (globalMdSource) console.log(`  ${chalk.green('✓')} CLAUDE.md global com regras e configuracoes`);
-  if (agentCount > 0) console.log(`  ${chalk.green('✓')} ${agentCount} agentes especializados`);
-  if (skillCount > 0) console.log(`  ${chalk.green('✓')} ${skillCount} skills / slash commands`);
-  console.log('');
+  raw(chalk.bold('  O que foi instalado:'));
+  if (globalMdSource) raw(`  ${chalk.green('✓')} CLAUDE.md global com regras e configuracoes`);
+  if (agentCount > 0) raw(`  ${chalk.green('✓')} ${agentCount} agentes especializados`);
+  if (skillCount > 0) raw(`  ${chalk.green('✓')} ${skillCount} skills / slash commands`);
+  raw('');
 
-  console.log(chalk.bold('  Proximos passos:'));
-  console.log(`  ${chalk.cyan('1.')} Abra o terminal e rode ${chalk.yellow('claude')} em qualquer projeto`);
-  console.log(`  ${chalk.cyan('2.')} Os agentes sao ativados automaticamente pelo contexto`);
-  console.log(`  ${chalk.cyan('3.')} Use skills digitando o comando (ex: ${chalk.yellow('/security-checklist')})`);
-  console.log('');
-  console.log(chalk.bold('  Comandos uteis:'));
-  console.log(`  ${chalk.yellow('claudiao list agents')}     Lista todos os agentes instalados`);
-  console.log(`  ${chalk.yellow('claudiao list skills')}     Lista todas as skills`);
-  console.log(`  ${chalk.yellow('claudiao create agent')}    Cria um novo agente`);
-  console.log(`  ${chalk.yellow('claudiao doctor')}          Verifica se tudo esta ok`);
-  console.log('');
+  raw(chalk.bold('  Proximos passos:'));
+  raw(`  ${chalk.cyan('1.')} Abra o terminal e rode ${chalk.yellow('claude')} em qualquer projeto`);
+  raw(`  ${chalk.cyan('2.')} Os agentes sao ativados automaticamente pelo contexto`);
+  raw(`  ${chalk.cyan('3.')} Use skills digitando o comando (ex: ${chalk.yellow('/security-checklist')})`);
+  raw('');
+  raw(chalk.bold('  Comandos uteis:'));
+  raw(`  ${chalk.yellow('claudiao list agents')}     Lista todos os agentes instalados`);
+  raw(`  ${chalk.yellow('claudiao list skills')}     Lista todas as skills`);
+  raw(`  ${chalk.yellow('claudiao create agent')}    Cria um novo agente`);
+  raw(`  ${chalk.yellow('claudiao doctor')}          Verifica se tudo esta ok`);
+  raw('');
 
   if (invalidCount > 0) {
     warn(`${invalidCount} item(s) nao foram instalados por frontmatter invalido. Rode ${chalk.yellow('claudiao doctor')} pra detalhes.`);

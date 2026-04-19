@@ -32,6 +32,7 @@ beforeEach(() => {
     'claudiao-ui-reminder.mjs',
     'claudiao-migration-reminder.mjs',
     'claudiao-commit-reminder.mjs',
+    'claudiao-pr-reminder.mjs',
   ]) {
     writeFileSync(join(TEMPLATES_DIR, 'hooks', name), '#!/usr/bin/env node\nprocess.exit(0)\n');
   }
@@ -154,6 +155,90 @@ describe('mergeHooksIntoSettings', () => {
       m.hooks.filter((h) => h.command.includes('claudiao-ui')),
     );
     expect(claudiaoHooks).toHaveLength(1);
+  });
+
+  it('installs pr category under Stop event without matcher field', async () => {
+    const paths = await import('../paths.js');
+    // @ts-expect-error test override
+    paths.CLAUDE_DIR = CLAUDE_DIR_OVERRIDE;
+
+    const { HOOK_CATEGORIES, mergeHooksIntoSettings, writeSettings, readSettings } = await importHooks();
+    const pr = HOOK_CATEGORIES.find((c) => c.id === 'pr')!;
+
+    writeSettings(mergeHooksIntoSettings([pr]));
+
+    const saved = readSettings();
+    expect(saved.hooks?.Stop).toBeDefined();
+    const stopEntries = saved.hooks!.Stop!;
+    expect(stopEntries).toHaveLength(1);
+    // Stop hooks don't carry a `matcher` field per Claude Code spec
+    expect(stopEntries[0].matcher).toBeUndefined();
+    expect(stopEntries[0].hooks[0].command).toContain('claudiao-pr-reminder.mjs');
+  });
+
+  it('preserves Stop entries from other tools when installing pr', async () => {
+    const paths = await import('../paths.js');
+    // @ts-expect-error test override
+    paths.CLAUDE_DIR = CLAUDE_DIR_OVERRIDE;
+
+    // Seed settings with a third-party Stop hook (e.g. superpowers plugin)
+    const initial = {
+      hooks: {
+        Stop: [
+          {
+            hooks: [{ type: 'command', command: '/path/to/other-stop-hook.js', timeout: 5 }],
+          },
+        ],
+      },
+    };
+    writeFileSync(join(CLAUDE_DIR_OVERRIDE, 'settings.json'), JSON.stringify(initial, null, 2));
+
+    const { HOOK_CATEGORIES, mergeHooksIntoSettings, writeSettings, readSettings } = await importHooks();
+    const pr = HOOK_CATEGORIES.find((c) => c.id === 'pr')!;
+
+    writeSettings(mergeHooksIntoSettings([pr]));
+
+    const saved = readSettings();
+    const commands = (saved.hooks?.Stop ?? []).flatMap((m) => m.hooks.map((h) => h.command));
+    expect(commands.some((c) => c.includes('other-stop-hook.js'))).toBe(true);
+    expect(commands.some((c) => c.includes('claudiao-pr-reminder.mjs'))).toBe(true);
+  });
+});
+
+describe('removeClaudiaoHooks with Stop event', () => {
+  it('removes pr hook from Stop event and preserves other Stop hooks', async () => {
+    const paths = await import('../paths.js');
+    // @ts-expect-error test override
+    paths.CLAUDE_DIR = CLAUDE_DIR_OVERRIDE;
+
+    const initial = {
+      hooks: {
+        Stop: [
+          {
+            hooks: [
+              { type: 'command', command: '/path/to/other-stop-hook.js', timeout: 5 },
+              {
+                type: 'command',
+                command: join(CLAUDE_DIR_OVERRIDE, 'hooks', 'claudiao-pr-reminder.mjs'),
+                timeout: 5,
+              },
+            ],
+          },
+        ],
+      },
+    };
+    writeFileSync(join(CLAUDE_DIR_OVERRIDE, 'settings.json'), JSON.stringify(initial, null, 2));
+
+    const { removeClaudiaoHooks, readSettings } = await importHooks();
+    const { removedCount, categoriesRemoved } = removeClaudiaoHooks(['pr']);
+
+    expect(removedCount).toBe(1);
+    expect(categoriesRemoved).toContain('pr');
+
+    const saved = readSettings();
+    const commands = (saved.hooks?.Stop ?? []).flatMap((m) => m.hooks.map((h) => h.command));
+    expect(commands.some((c) => c.includes('other-stop-hook.js'))).toBe(true);
+    expect(commands.some((c) => c.includes('claudiao-pr-reminder'))).toBe(false);
   });
 });
 

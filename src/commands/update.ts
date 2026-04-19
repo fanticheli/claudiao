@@ -11,7 +11,8 @@ import {
   hasErrors,
   hasWarnings,
 } from '../lib/validate-frontmatter.js';
-import { banner, success, warn, error, heading, info } from '../lib/format.js';
+import { banner, success, warn, error, heading, info, dim, raw, debug } from '../lib/format.js';
+import { dryRunnable } from '../lib/dry-run.js';
 
 export function update(options?: { force?: boolean; dryRun?: boolean }): void {
   const force = options?.force ?? false;
@@ -21,7 +22,7 @@ export function update(options?: { force?: boolean; dryRun?: boolean }): void {
 
   if (dryRun) {
     info('[dry-run] Nenhuma alteracao sera feita');
-    console.log('');
+    raw('');
   }
 
   const repoPath = getExternalRepoPath();
@@ -29,21 +30,20 @@ export function update(options?: { force?: boolean; dryRun?: boolean }): void {
   // Git pull if external repo
   if (repoPath) {
     heading('Atualizando repositorio...');
-    if (dryRun) {
-      info(`[dry-run] Executaria git pull em ${repoPath}`);
-    } else {
+    dryRunnable({ dryRun }, () => {
       try {
         const result = execSync('git pull', { cwd: repoPath, encoding: 'utf-8' });
         if (result.includes('Already up to date')) {
           info('Repositorio ja esta atualizado');
         } else {
           success('Git pull concluido');
-          console.log(chalk.dim('    ' + result.trim()));
+          dim(result.trim());
         }
-      } catch {
+      } catch (err) {
         warn('Falha no git pull (pode ser um diretorio local sem remote)');
+        debug(`git pull error: ${err instanceof Error ? err.message : String(err)}`);
       }
-    }
+    }, `Executaria git pull em ${repoPath}`);
   }
 
   // Re-link new agents
@@ -178,26 +178,28 @@ export function update(options?: { force?: boolean; dryRun?: boolean }): void {
   }
 
   // Sync version in config file (fixes BUG-001: version was hardcoded)
-  if (!dryRun && existsSync(CONFIG_FILE)) {
-    try {
-      const existing = JSON.parse(readFileSync(CONFIG_FILE, 'utf-8')) as Record<string, unknown>;
-      const currentVersion = getPackageVersion();
-      if (existing.version !== currentVersion) {
-        existing.version = currentVersion;
-        writeFileSync(CONFIG_FILE, JSON.stringify(existing, null, 2));
+  if (existsSync(CONFIG_FILE)) {
+    dryRunnable({ dryRun }, () => {
+      try {
+        const existing = JSON.parse(readFileSync(CONFIG_FILE, 'utf-8')) as Record<string, unknown>;
+        const currentVersion = getPackageVersion();
+        if (existing.version !== currentVersion) {
+          existing.version = currentVersion;
+          writeFileSync(CONFIG_FILE, JSON.stringify(existing, null, 2));
+        }
+      } catch (err) {
+        // expected: .claudiao.json may be missing or malformed; sync runs
+        // best-effort. Subsequent `init`/`update` rewrites the file fresh.
+        debug(`skipped version sync: ${err instanceof Error ? err.message : String(err)}`);
       }
-    } catch {
-      // ignore corrupt config
-    }
-  } else if (dryRun) {
-    info(`[dry-run] Sincronizaria version em .claudiao.json com ${getPackageVersion()}`);
+    }, `Sincronizaria version em .claudiao.json com ${getPackageVersion()}`);
   }
 
-  console.log('');
+  raw('');
   success('Atualizacao concluida!');
   if (invalidCount > 0) {
     warn(`${invalidCount} item(s) pulados por frontmatter invalido. Rode ${chalk.yellow('claudiao doctor')} pra detalhes.`);
     process.exitCode = 1;
   }
-  console.log('');
+  raw('');
 }

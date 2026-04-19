@@ -11,6 +11,7 @@ export function isSymlink(path: string): boolean {
   try {
     return lstatSync(path).isSymbolicLink();
   } catch {
+    // expected: path may simply not exist; callers treat that as "not a symlink"
     return false;
   }
 }
@@ -19,6 +20,7 @@ export function getSymlinkTarget(path: string): string | null {
   try {
     return readlinkSync(path);
   } catch {
+    // expected: non-symlink or missing path; callers handle null
     return null;
   }
 }

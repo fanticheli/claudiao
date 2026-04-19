@@ -28,6 +28,7 @@ beforeEach(() => {
     'claudiao-ui-reminder.mjs',
     'claudiao-migration-reminder.mjs',
     'claudiao-commit-reminder.mjs',
+    'claudiao-pr-reminder.mjs',
   ]) {
     writeFileSync(join(TEMPLATES_DIR, 'hooks', name), '#!/usr/bin/env node\n');
   }
@@ -59,7 +60,7 @@ describe('removeClaudiaoHooks — selective removal via --only', () => {
 
     const remaining = listInstalledHooks();
     const ids = remaining.map((h) => h.category).sort();
-    expect(ids).toEqual(['commit', 'migration', 'security']);
+    expect(ids).toEqual(['commit', 'migration', 'pr', 'security']);
   });
 
   it('removes multiple categories when called with --only ui,migration', async () => {
@@ -72,7 +73,7 @@ describe('removeClaudiaoHooks — selective removal via --only', () => {
 
     const remaining = listInstalledHooks();
     const ids = remaining.map((h) => h.category).sort();
-    expect(ids).toEqual(['commit', 'security']);
+    expect(ids).toEqual(['commit', 'pr', 'security']);
   });
 
   it('preserves unrelated (non-claudiao) hooks during selective removal', async () => {
@@ -120,16 +121,16 @@ describe('removeClaudiaoHooks — selective removal via --only', () => {
     await installAll();
     const { removeClaudiaoHooks, listInstalledHooks } = await importHooks();
 
-    // ensure all 4 categories are installed
-    expect(listInstalledHooks()).toHaveLength(4);
+    // ensure all 5 categories are installed (security, ui, migration, commit, pr)
+    expect(listInstalledHooks()).toHaveLength(5);
 
     // remove only ui first
     removeClaudiaoHooks(['ui']);
-    expect(listInstalledHooks()).toHaveLength(3);
+    expect(listInstalledHooks()).toHaveLength(4);
 
     // second uninstall --only ui should find nothing to remove
     const result = removeClaudiaoHooks(['ui']);
     expect(result.removedCount).toBe(0);
-    expect(listInstalledHooks()).toHaveLength(3);
+    expect(listInstalledHooks()).toHaveLength(4);
   });
 });

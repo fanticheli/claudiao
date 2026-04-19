@@ -5,6 +5,17 @@
 
 ---
 
+## ✅ Resolvido em 1.3.0
+
+> Entregue na branch `feat/v1.3.0-stop-hook-techdebt`. Foco em fechamento de loop (Stop hook) e consolidação de tech debt.
+
+- **Fechamento do loop do fluxo**: novo Stop hook (`pr`) lembra `/pr-template` e `/security-checklist` ao finalizar sessão com edits. Detecta sessões só-leitura via `tool_use_count`, `has_edits` ou parsing de `transcript_path` e passa em silêncio. Complementa FEAT-021 (hooks `PreToolUse` de edição) fechando o gap identificado na validação de 18/04/2026.
+- **DEBT-001 (catches silenciosos)**: cada catch legítimo ganhou comentário `// expected: <razão>` + `debug()` pra surfacar detalhe em modo verbose.
+- **DEBT-002 (output descentralizado)**: todos os `console.log/error/warn` em commands agora passam por `lib/format.ts`. Respeitam `setQuiet` e `setJsonMode` — `--quiet` e `--json` viram flags triviais de adicionar no futuro.
+- **DEBT-003 (duplicação de dry-run)**: helper `dryRunnable` em `lib/dry-run.ts`; `init`, `update` e `remove` agora usam esse wrapper em vez de if/else repetido.
+- **DEBT-006 (sem modo verbose)**: flag global `--verbose`/`-v` e env var `CLAUDIAO_DEBUG=1` ativam `[debug]` logging via stderr. README ganhou seção "Troubleshooting" apontando pro fluxo novo.
+- **Clarificação documental**: README ganhou seção "Relação com outros plugins do Claude Code" explicando que `superpowers`/`get-shit-done` são plugins separados (não bundled). BACKLOG registra que a feature de bundles foi adiada por falta de caso de uso concreto.
+
 ## ✅ Resolvido em 1.2.1
 
 > Hotfix de 18/04/2026 — regressões identificadas logo após publicar a 1.2.0. Branch `fix/v1.2.1-doctor-hooks-regression`.
@@ -323,20 +334,14 @@ _FEAT-021 e FEAT-022 foram concluídas em 1.1.0 — ver seção "✅ Resolvido" 
 
 ## Tech debt
 
-### DEBT-001: Catch blocks silenciosos
-**Onde:** `paths.ts:48`, `init.ts:93`, `list.ts:36`, `doctor.ts:19`
-**Problema:** `catch { }` sem nenhum log dificulta debug quando algo dá errado silenciosamente.
-**Solução:** Adicionar `// expected: corrupt config` ou log em modo verbose.
+### DEBT-001: Catch blocks silenciosos — ✅ resolvido em 1.3.0
+_Anotação explícita `// expected: <razão>` em cada catch legítimo, + `debug()` via formato novo verbose. Runtime não é mais caixa preta — `--verbose`/`CLAUDIAO_DEBUG=1` expõe o motivo do ignore._
 
-### DEBT-002: `console.log` espalhado nos commands
-**Onde:** Todos os commands usam mix de `console.log()` direto e funções de `format.ts`.
-**Problema:** Inconsistência no output. Dificulta futura implementação de `--json` e `--quiet`.
-**Solução:** Rotear todo output por `format.ts`. Adicionar `output.write()` que respeita flags globais.
+### DEBT-002: `console.log` espalhado nos commands — ✅ resolvido em 1.3.0
+_Todos os `console.log/error/warn` em commands agora passam por `lib/format.ts` (funções tipadas + `output` namespace). Respeitam `setQuiet`/`setJsonMode` globais — preparado pra flags `--quiet` e `--json` futuras sem retrabalho em commands._
 
-### DEBT-003: Duplicação de lógica dry-run
-**Onde:** `init.ts`, `update.ts`, `remove.ts`
-**Problema:** Cada command reimplementa a lógica de dry-run com if/else. Muito boilerplate.
-**Solução:** Criar wrapper `dryRunnable(action, dryMessage)` ou middleware no Commander.
+### DEBT-003: Duplicação de lógica dry-run — ✅ resolvido em 1.3.0
+_Helper `dryRunnable(ctx, action, message)` em `lib/dry-run.ts`. Refatorado em `init`, `update` e `remove`. Novos commands dry-run-aware viram one-liner._
 
 ### DEBT-004: Sem validação do frontmatter ao instalar — ✅ resolvido em 1.2.0
 _Concluído na branch `feat/v1.2.0-bugs-bundles-hooks`. Validação compartilhada via `src/lib/validate-frontmatter.ts` agora roda em `init`, `update` e `create`._
@@ -346,11 +351,8 @@ _Concluído na branch `feat/v1.2.0-bugs-bundles-hooks`. Validação compartilhad
 **Problema:** Seguro hoje (registry hardcoded), mas se o registry virar dinâmico (FEAT-006), é injection direto.
 **Solução:** Sanitizar ou usar `spawn` com array de args em vez de `execSync` com string.
 
-### DEBT-006: Sem modo verbose/debug
-**Onde:** Global
-**Problema:** Quando algo dá errado, não tem como ver detalhes. O `doctor` ajuda, mas não cobre runtime.
-**Solução:** Flag `--verbose` ou env var `CLAUDIAO_DEBUG=1` que ativa logs detalhados em todos os commands.
-**Nota:** Escalado como FEAT-030 (promovido de debt para feature por impacto em adoção).
+### DEBT-006: Sem modo verbose/debug — ✅ resolvido em 1.3.0
+_Flag global `--verbose` (`-v`) + env var `CLAUDIAO_DEBUG=1` em `src/index.ts`. `debug()` do `lib/format.ts` emite `[debug]` em stderr só quando ativo. Catch blocks anotados logam pelo mesmo canal. Env var sempre vence pra facilitar CI/scripts._
 
 ### DEBT-007: Hook scripts sem testes de integração — ✅ resolvido em 1.2.0
 _Concluído junto com FEAT-028. Integration tests em `src/lib/__tests__/hook-scripts.integration.test.ts`._
@@ -359,6 +361,20 @@ _Concluído junto com FEAT-028. Integration tests em `src/lib/__tests__/hook-scr
 **Onde:** `README.md`
 **Problema:** README descreve funcionalidades da 1.0 mas não menciona hooks (1.1), validação de frontmatter no doctor (1.1), nem como usar os triggers de skill. Usuário que lê o README não sabe o que instalou.
 **Solução:** Atualizar README com seção "What's new in 1.1" e, preferencialmente, estrutura evergreen com link para CHANGELOG em vez de repetir conteúdo. Resolver junto com FEAT-026.
+
+---
+
+## Decisões de escopo
+
+### Bundles opt-in — adiado indefinidamente (era FEAT-023 pra 1.3.0)
+
+Originalmente planejado pra v1.3.0 como forma de separar agents "core" do claudião de bundles de terceiros (ex: GSD). **Adiado** pelos seguintes motivos:
+
+1. **Premissa original estava errada:** GSD/superpowers é plugin separado do Claude Code (instalado via `claude /plugin install`), não bundled no claudião. Nunca houve "agents GSD" dentro do pacote claudião pra separar — os 17 agents `gsd-*` vêm do plugin `superpowers`/`get-shit-done` que o usuário instala independentemente. A documentação do README (seção "Relação com outros plugins do Claude Code") agora explicita isso.
+2. **Sem caso de uso concreto:** sem demanda real por bundles customizados, a infraestrutura de bundles (paths de resolução, comandos `install bundle`/`uninstall bundle`, coluna source em `list`, migração v1.2→v1.3) seria over-engineering — modelar um sistema de distribuição antes de ter demanda é anti-pragmático.
+3. **Arquitetura provavelmente diferente quando vier:** se houver demanda, a forma certa provavelmente é `install bundle <url-git>` (instalação de repo remoto de terceiros) em vez de templates bundled no pacote claudião. Isso inverte o modelo do que foi desenhado.
+
+**Revisitar quando:** houver pelo menos 3 pedidos diferentes de usuários querendo empacotar conjuntos próprios de agents/skills pra distribuição. Até lá, usuários com conjuntos próprios podem usar o recurso de `repoPath` em `.claudiao.json` (repo externo).
 
 ---
 
