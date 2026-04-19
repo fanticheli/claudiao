@@ -3,7 +3,7 @@
 import { Command } from 'commander';
 import { init } from './commands/init.js';
 import { createAgent, createSkill } from './commands/create.js';
-import { listAgents, listSkills, listPlugins } from './commands/list.js';
+import { listAgents, listSkills } from './commands/list.js';
 import { doctor } from './commands/doctor.js';
 import { removeAgent, removeSkill } from './commands/remove.js';
 import { update } from './commands/update.js';
@@ -78,7 +78,7 @@ Exemplos:
 // ============================================================
 const list = program
   .command('list')
-  .description('Lista agentes, skills ou plugins');
+  .description('Lista agentes ou skills instalados');
 
 list
   .command('agents')
@@ -92,13 +92,6 @@ list
   .description('Lista todas as skills instaladas (slash commands)')
   .action(() => {
     listSkills();
-  });
-
-list
-  .command('plugins')
-  .description('Lista plugins da comunidade disponiveis')
-  .action(() => {
-    listPlugins();
   });
 
 // ============================================================
