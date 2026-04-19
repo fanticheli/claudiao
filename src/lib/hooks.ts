@@ -217,11 +217,17 @@ export function mergeHooksIntoSettings(categories: HookCategory[]): SettingsJson
 }
 
 /**
- * Removes all claudiao-managed hooks from settings.json. Preserves other hooks.
+ * Removes claudiao-managed hooks from settings.json, preserving other
+ * hooks. If `onlyCategories` is provided, removes only those category
+ * ids; otherwise removes every claudiao hook.
  */
-export function removeClaudiaoHooks(): { removedCount: number; categoriesRemoved: string[] } {
+export function removeClaudiaoHooks(
+  onlyCategories?: string[],
+): { removedCount: number; categoriesRemoved: string[] } {
   const settings = readSettings();
   if (!settings.hooks) return { removedCount: 0, categoriesRemoved: [] };
+
+  const filterSet = onlyCategories && onlyCategories.length > 0 ? new Set(onlyCategories) : null;
 
   let removedCount = 0;
   const categoriesRemoved = new Set<string>();
@@ -234,13 +240,12 @@ export function removeClaudiaoHooks(): { removedCount: number; categoriesRemoved
 
     for (const m of list) {
       const kept = m.hooks.filter((h) => {
-        if (h.type === 'command' && isClaudiaoHook(h.command)) {
-          removedCount++;
-          const cat = findCategoryByScript(h.command);
-          if (cat) categoriesRemoved.add(cat.id);
-          return false;
-        }
-        return true;
+        if (h.type !== 'command' || !isClaudiaoHook(h.command)) return true;
+        const cat = findCategoryByScript(h.command);
+        if (filterSet && (!cat || !filterSet.has(cat.id))) return true;
+        removedCount++;
+        if (cat) categoriesRemoved.add(cat.id);
+        return false;
       });
 
       if (kept.length > 0) {
