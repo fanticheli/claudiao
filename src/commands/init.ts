@@ -17,7 +17,6 @@ import {
 } from '../lib/validate-frontmatter.js';
 import { banner, success, warn, error, info, dim, heading, separator, raw, debug } from '../lib/format.js';
 import { dryRunnable } from '../lib/dry-run.js';
-import { PLUGINS } from '../lib/plugins.js';
 import { execSync } from 'node:child_process';
 
 export async function init(options?: { dryRun?: boolean }): Promise<void> {
@@ -227,53 +226,6 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
     }
   } else {
     warn('Nenhuma skill encontrada. Use `claudiao create skill` pra criar.');
-  }
-
-  // Ask about plugins
-  if (dryRun) {
-    raw('');
-    info('[dry-run] Pulando prompts de plugins');
-    info('[dry-run] Plugins disponiveis: superpowers, get-shit-done, claude-mem');
-  } else {
-    raw('');
-    const { installPlugins } = await inquirer.prompt([{
-      type: 'confirm',
-      name: 'installPlugins',
-      message: 'Quer instalar plugins da comunidade? (superpowers, get-shit-done, claude-mem)',
-      default: false,
-    }]);
-
-    if (installPlugins) {
-      heading('Plugins da Comunidade');
-
-      for (const plugin of PLUGINS) {
-        raw('');
-        raw(`  ${chalk.bold(plugin.name)} ${plugin.stars ? chalk.dim(`(${plugin.stars} stars)`) : ''}`);
-        dim(plugin.description);
-        dim(`Repo: ${plugin.repo}`);
-        raw('');
-
-        const { install } = await inquirer.prompt([{
-          type: 'confirm',
-          name: 'install',
-          message: `  Instalar ${plugin.name}?`,
-          default: false,
-        }]);
-
-        if (install) {
-          try {
-            execSync(plugin.installCommand, { stdio: 'inherit' });
-            success(`${plugin.name} instalado`);
-          } catch (err) {
-            // expected: plugin install can fail (network, auth, upstream
-            // repo). Surface a manual retry hint and continue — the loop
-            // still offers the remaining plugins.
-            error(`Falha ao instalar ${plugin.name}. Tente manualmente: ${plugin.installCommand}`);
-            debug(`${plugin.installCommand} failed: ${err instanceof Error ? err.message : String(err)}`);
-          }
-        }
-      }
-    }
   }
 
   // Save config — preserve existing repoPath if current source is unavailable

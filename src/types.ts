@@ -13,14 +13,6 @@ export interface SkillMeta {
   model: string;
 }
 
-export interface PluginInfo {
-  name: string;
-  description: string;
-  installCommand: string;
-  repo: string;
-  stars?: string;
-}
-
 export interface ClaudiaoConfig {
   repoPath?: string;
   installedAt: string;
