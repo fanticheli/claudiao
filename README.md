@@ -302,6 +302,26 @@ Os hooks editam `~/.claude/settings.json` fazendo merge (não overwrite) — hoo
 | [get-shit-done](https://github.com/gsd-build/get-shit-done) | Planejamento spec-driven com fases (discuss, plan, execute, verify) e estado persistido |
 | [claude-mem](https://github.com/thedotmack/claude-mem) | Memória persistente entre sessões via SQLite + busca vetorial |
 
+## Relação com outros plugins do Claude Code
+
+O claudião gerencia agents, skills, hooks e CLAUDE.md global dentro de `~/.claude/`. Esse diretório pode conter itens instalados por **outras fontes** — é importante entender o que o claudião gerencia e o que não.
+
+**Fontes que convivem em `~/.claude/`**:
+
+- **Plugins do Claude Code** (instalados via `claude /plugin install <nome>`) — ex: `superpowers`, `get-shit-done` (GSD), `claude-mem`. Esses plugins podem adicionar agents, hooks e skills em `~/.claude/` independente do claudião, com ciclo de vida próprio.
+- **Customizações manuais** do usuário — arquivos `.md` criados direto em `~/.claude/agents/` ou similar.
+- **Repo externo** configurado via `.claudiao.json` com `repoPath`.
+- **Core do claudião** — os 18 agents, 9 skills, 5 hooks e CLAUDE.md global bundled no pacote.
+
+**O que o claudião gerencia:** apenas os itens instalados pelo próprio claudião. São identificáveis por serem symlinks pros templates do pacote ou do repo externo configurado. A coluna `source` em `claudiao list agents/skills` (`[core|external|local]`) ajuda a distinguir.
+
+**O que o claudião NÃO gerencia:**
+
+- Agents e hooks instalados por plugins como `superpowers` ou `get-shit-done` — esses seguem o ciclo de vida do plugin. Use `claude /plugin` pra gerenciá-los.
+- Arquivos criados manualmente pelo usuário em `~/.claude/`.
+
+Se `claudiao doctor` reporta warnings em agents cujos nomes começam com `gsd-` ou similar, eles provavelmente vêm de um plugin instalado separadamente (não do claudião). Rode `claude /plugin list` pra ver plugins ativos do Claude Code.
+
 ## Repo externo (avançado)
 
 Se você mantém seus agentes/skills num repo Git separado, configure em `~/.claude/.claudiao.json`:
