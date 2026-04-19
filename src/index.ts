@@ -9,6 +9,7 @@ import { removeAgent, removeSkill } from './commands/remove.js';
 import { update } from './commands/update.js';
 import { installPlugin } from './commands/install-plugin.js';
 import { installHooks, uninstallHooks, listHooks } from './commands/hooks.js';
+import { installStatusline, uninstallStatusline, listStatusline } from './commands/statusline.js';
 import { getPackageVersion } from './lib/package-info.js';
 import { setVerbose, debug } from './lib/format.js';
 
@@ -193,6 +194,37 @@ hooks
   .description('Lista hooks do claudiao atualmente instalados')
   .action(() => {
     listHooks();
+  });
+
+// ============================================================
+// statusline
+// ============================================================
+const statusline = program
+  .command('statusline')
+  .description('Gerencia a statusline do claudiao (barra de contexto no rodape do Claude Code)');
+
+statusline
+  .command('install')
+  .description('Instala a statusline de contexto (mostra dir, branch, modelo, % de contexto, custo)')
+  .option('--force', 'Substitui statusLine existente de outra origem sem perguntar')
+  .option('--dry-run', 'Mostra o que seria feito sem executar')
+  .action(async (options: { force?: boolean; dryRun?: boolean }) => {
+    await installStatusline(options);
+  });
+
+statusline
+  .command('uninstall')
+  .description('Remove a statusline do claudiao (preserva statusLine de outras origens)')
+  .option('-y, --yes', 'Pula confirmacao interativa')
+  .action(async (options: { yes?: boolean }) => {
+    await uninstallStatusline(options);
+  });
+
+statusline
+  .command('list')
+  .description('Mostra a statusLine ativa e se foi instalada pelo claudiao')
+  .action(() => {
+    listStatusline();
   });
 
 // ============================================================
