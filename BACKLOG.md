@@ -160,9 +160,9 @@ _FEAT-021 e FEAT-022 foram concluídas em 1.1.0 — ver seção "✅ Resolvido" 
 
 ## P2 — Melhorias de médio prazo
 
-### FEAT-006: Plugin registry dinâmico — ❌ cancelado (fora de escopo desde v1.4.0)
+### FEAT-006: Plugin registry dinâmico — ❌ cancelado (fora de escopo desde v1.5.0)
 **Descrição original:** mover o registry de plugins do código para um JSON externo.
-**Motivo do cancelamento:** a v1.4.0 removeu por completo a gestão de plugins de terceiros (ver seção "Decisões de escopo" abaixo). Plugins do Claude Code passam a ser responsabilidade exclusiva do comando nativo `claude /plugin`.
+**Motivo do cancelamento:** a v1.5.0 removeu por completo a gestão de plugins de terceiros (ver seção "Decisões de escopo" abaixo). Plugins do Claude Code passam a ser responsabilidade exclusiva do comando nativo `claude /plugin`.
 
 ### FEAT-007: Importar agente/skill de URL ou gist
 **Descrição:** Instalar um agente ou skill a partir de uma URL (GitHub raw, gist, etc).
@@ -341,8 +341,8 @@ _Helper `dryRunnable(ctx, action, message)` em `lib/dry-run.ts`. Refatorado em `
 ### DEBT-004: Sem validação do frontmatter ao instalar — ✅ resolvido em 1.2.0
 _Concluído na branch `feat/v1.2.0-bugs-bundles-hooks`. Validação compartilhada via `src/lib/validate-frontmatter.ts` agora roda em `init`, `update` e `create`._
 
-### DEBT-005: `install-plugin` sem validação de command injection — ❌ cancelado (v1.4.0)
-_O comando `claudiao install plugin` foi substituído por stub de deprecação na v1.4.0 — não executa mais comandos externos. Risco eliminado por remoção da superfície, não por sanitização._
+### DEBT-005: `install-plugin` sem validação de command injection — ❌ cancelado (v1.5.0)
+_O comando `claudiao install plugin` foi substituído por stub de deprecação na v1.5.0 — não executa mais comandos externos. Risco eliminado por remoção da superfície, não por sanitização._
 
 ### DEBT-006: Sem modo verbose/debug — ✅ resolvido em 1.3.0
 _Flag global `--verbose` (`-v`) + env var `CLAUDIAO_DEBUG=1` em `src/index.ts`. `debug()` do `lib/format.ts` emite `[debug]` em stderr só quando ativo. Catch blocks anotados logam pelo mesmo canal. Env var sempre vence pra facilitar CI/scripts._
@@ -359,7 +359,7 @@ _Concluído junto com FEAT-028. Integration tests em `src/lib/__tests__/hook-scr
 
 ## Decisões de escopo
 
-### Gestão de plugins de terceiros — removido em v1.4.0
+### Gestão de plugins de terceiros — removido em v1.5.0
 
 Originalmente a v1.0 incluía `claudiao install plugin <nome>` e `claudiao list plugins` como conveniência pra instalar superpowers/get-shit-done/claude-mem via `npm` / comandos do Claude Code. Decisão de remover baseada em:
 
@@ -367,9 +367,18 @@ Originalmente a v1.0 incluía `claudiao install plugin <nome>` e `claudiao list 
 2. **Registry hardcoded desatualiza** — a lista de 3 plugins (`superpowers`, `get-shit-done`, `claude-mem`) em `src/lib/plugins.ts` requer bump de versão a cada novo plugin da comunidade, o que não escala.
 3. **Superfície de teste menor = manutenção mais barata** — removeu `src/lib/plugins.ts`, `src/commands/install-plugin.ts` (parcialmente — virou stub de deprecação), `listPlugins()` em `src/commands/list.ts`, bloco de prompts em `init.ts`, interface `PluginInfo` em `types.ts` e seções inteiras do README.
 
-claudião v1.4.0 foca exclusivamente no que é único dele: agents, skills, hooks, CLAUDE.md global. Plugins ficam com seu sistema nativo.
+claudião v1.5.0 foca exclusivamente no que é único dele: agents, skills, hooks, statusline e CLAUDE.md global. Plugins ficam com seu sistema nativo.
 
 **Migração:** `claudiao install plugin superpowers` → `claude /plugin install superpowers`.
+
+### Statusline de contexto — adicionada em v1.5.0
+
+Adicionada como feature opt-in no `init` (default `yes`) com comandos dedicados `claudiao statusline install|uninstall|list`. Motivação: usuários de Opus 4.7 com 1M de contexto precisam saber em tempo real quando a sessão tá se aproximando do teto — o Claude Code expõe `context_window.used_percentage` no stdin do script de statusLine, e a única tarefa é consumir isso.
+
+Decisão de design: seguir o padrão dos hooks (copy + preservar config de outras origens) em vez de symlink. Motivos:
+1. **Cross-platform**: symlink de arquivo exige admin no Windows.
+2. **Preservação**: `claudiao statusline uninstall` só remove se detectar que o path bate com o padrão do claudião — statusLines de outras origens ficam intactas.
+3. **Consistência**: mesmo mental model dos 5 hooks bundled (copy pra `~/.claude/<area>/`, gravar entry em `settings.json`).
 
 ### Bundles opt-in — adiado indefinidamente (era FEAT-023 pra 1.3.0)
 
