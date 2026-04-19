@@ -11,7 +11,7 @@ import {
   hasErrors,
   hasWarnings,
 } from '../lib/validate-frontmatter.js';
-import { banner, success, warn, error, heading, info, dim, raw } from '../lib/format.js';
+import { banner, success, warn, error, heading, info, dim, raw, debug } from '../lib/format.js';
 
 export function update(options?: { force?: boolean; dryRun?: boolean }): void {
   const force = options?.force ?? false;
@@ -40,8 +40,9 @@ export function update(options?: { force?: boolean; dryRun?: boolean }): void {
           success('Git pull concluido');
           dim(result.trim());
         }
-      } catch {
+      } catch (err) {
         warn('Falha no git pull (pode ser um diretorio local sem remote)');
+        debug(`git pull error: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
   }
@@ -186,8 +187,10 @@ export function update(options?: { force?: boolean; dryRun?: boolean }): void {
         existing.version = currentVersion;
         writeFileSync(CONFIG_FILE, JSON.stringify(existing, null, 2));
       }
-    } catch {
-      // ignore corrupt config
+    } catch (err) {
+      // expected: .claudiao.json may be missing or malformed; sync runs
+      // best-effort. Subsequent `init`/`update` rewrites the file fresh.
+      debug(`skipped version sync: ${err instanceof Error ? err.message : String(err)}`);
     }
   } else if (dryRun) {
     info(`[dry-run] Sincronizaria version em .claudiao.json com ${getPackageVersion()}`);

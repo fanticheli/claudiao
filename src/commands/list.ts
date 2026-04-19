@@ -4,7 +4,7 @@ import chalk from 'chalk';
 import { CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, PACKAGE_ROOT } from '../lib/paths.js';
 import { parseAgentFile, parseSkillFile } from '../lib/frontmatter.js';
 import { getInstallSource } from '../lib/symlinks.js';
-import { banner, heading, table, info, raw } from '../lib/format.js';
+import { banner, heading, table, info, raw, debug } from '../lib/format.js';
 import { PLUGINS } from '../lib/plugins.js';
 
 export function listAgents(): void {
@@ -35,7 +35,10 @@ export function listAgents(): void {
         source,
         status: 'installed' as const,
       };
-    } catch {
+    } catch (err) {
+      // expected: malformed frontmatter — doctor surfaces the real issue.
+      // Keep the row visible so the user still sees the file exists.
+      debug(`list parseAgentFile(${file}) failed: ${err instanceof Error ? err.message : String(err)}`);
       return {
         name: file.replace('.md', ''),
         description: chalk.dim('(erro ao ler frontmatter)'),
@@ -115,8 +118,10 @@ export function listSkills(): void {
           source,
         };
       }
-    } catch {
-      // fallthrough
+    } catch (err) {
+      // expected: malformed SKILL.md frontmatter — row still rendered
+      // below with an empty description so the skill remains visible.
+      debug(`list parseSkillFile(${skillFile}) failed: ${err instanceof Error ? err.message : String(err)}`);
     }
     return {
       name: '/' + d.name,

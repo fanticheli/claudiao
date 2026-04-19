@@ -143,6 +143,9 @@ export function readSettings(): SettingsJson {
   try {
     return JSON.parse(readFileSync(SETTINGS_FILE, 'utf-8')) as SettingsJson;
   } catch {
+    // expected: settings.json may be partially written or malformed by
+    // another tool. Starting from empty avoids crashing the hooks
+    // install flow; claudiao will merge its entries into a fresh object.
     return {};
   }
 }
