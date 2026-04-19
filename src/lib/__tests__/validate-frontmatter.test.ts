@@ -118,7 +118,26 @@ describe('validateAgentFrontmatter', () => {
     ).toBe(true);
   });
 
-  it('reports error when tools is not a string', () => {
+  it('accepts tools as YAML array (Claude Code supports both CSV and array)', () => {
+    const dir = makeTmp();
+    const file = writeAgent(
+      dir,
+      'arraytools',
+      [
+        'name: arraytools',
+        'description: descrição boa com gatilho use when, suficientemente longa pra passar no minimo de chars',
+        'tools:',
+        '  - Read',
+        '  - Write',
+        'model: opus',
+      ].join('\n'),
+    );
+
+    const result = validateAgentFrontmatter(file);
+    expect(result.issues.some((i) => i.field === 'tools' && i.severity === 'error')).toBe(false);
+  });
+
+  it('reports error when tools is neither string nor string array', () => {
     const dir = makeTmp();
     const file = writeAgent(
       dir,
@@ -127,8 +146,7 @@ describe('validateAgentFrontmatter', () => {
         'name: badtools',
         'description: descrição boa com gatilho use when, suficientemente longa pra passar no minimo de chars',
         'tools:',
-        '  - Read',
-        '  - Write',
+        '  nested: true',
         'model: opus',
       ].join('\n'),
     );
