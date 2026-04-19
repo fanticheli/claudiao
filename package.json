@@ -7,7 +7,7 @@
     "claudiao": "dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "dev": "tsx src/index.ts",
     "prepublishOnly": "npm run build",
     "typecheck": "tsc --noEmit",
