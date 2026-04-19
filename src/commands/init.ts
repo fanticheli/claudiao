@@ -16,6 +16,7 @@ import {
   hasWarnings,
 } from '../lib/validate-frontmatter.js';
 import { banner, success, warn, error, info, dim, heading, separator, raw, debug } from '../lib/format.js';
+import { dryRunnable } from '../lib/dry-run.js';
 import { PLUGINS } from '../lib/plugins.js';
 import { execSync } from 'node:child_process';
 
@@ -55,11 +56,7 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
   const globalMdSource = getGlobalMdSource();
 
   // Create ~/.claude/
-  if (!dryRun) {
-    ensureDir(CLAUDE_DIR);
-  } else {
-    info('[dry-run] Criaria diretorio ~/.claude/ (se nao existir)');
-  }
+  dryRunnable({ dryRun }, () => ensureDir(CLAUDE_DIR), 'Criaria diretorio ~/.claude/ (se nao existir)');
 
   // [1/3] Install CLAUDE.md global
   heading('[1/3] CLAUDE.md Global');
@@ -67,16 +64,14 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
   raw('');
 
   if (globalMdSource) {
-    if (dryRun) {
-      info(`[dry-run] Linkaria ${globalMdSource} -> ~/.claude/CLAUDE.md`);
-    } else {
+    dryRunnable({ dryRun }, () => {
       const result = createSymlink(globalMdSource, CLAUDE_MD);
       if (result.status === 'created' || result.status === 'backup') {
         success('~/.claude/CLAUDE.md instalado');
       } else if (result.status === 'skipped') {
         info('CLAUDE.md ja estava instalado');
       }
-    }
+    }, `Linkaria ${globalMdSource} -> ~/.claude/CLAUDE.md`);
   } else {
     warn('global-CLAUDE.md nao encontrado');
   }
