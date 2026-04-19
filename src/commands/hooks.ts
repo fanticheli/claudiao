@@ -8,6 +8,7 @@ import {
   writeSettings,
   removeClaudiaoHooks,
   listInstalledHooks,
+  migrateClaudiaoHookMatchers,
   parseOnlyFlag,
   SETTINGS_FILE,
 } from '../lib/hooks.js';
@@ -21,6 +22,16 @@ export async function installHooks(options?: { only?: string; dryRun?: boolean }
   if (dryRun) {
     info('[dry-run] Nenhuma alteração será feita');
     console.log('');
+  }
+
+  // Silently heal hooks installed by older claudiao versions whose
+  // matcher drifted (e.g. migration shipped as 'Write' in 1.2.0 and is
+  // 'Write|Edit' from 1.2.1 on).
+  if (!dryRun) {
+    const migrated = migrateClaudiaoHookMatchers();
+    if (migrated > 0) {
+      dim(`Migrados ${migrated} hook(s) com matchers desatualizados de versões anteriores.`);
+    }
   }
 
   // Resolve categorias a instalar
