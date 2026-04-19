@@ -7,6 +7,20 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.2.1] — 2026-04-18
+
+### Fixed
+
+- **Regressão da 1.2.0**: `claudiao doctor` reportava todos os symlinks válidos como quebrados quando rodado de um CWD diferente do diretório do symlink. A checagem usava `existsSync(readlinkSync(path))`, que resolve paths relativos contra `process.cwd()`. Agora a validação está centralizada em `isSymlinkBroken` (`src/lib/symlinks.ts`) e resolve contra o diretório do symlink.
+- `claudiao hooks install --only a,b` ignorava silenciosamente a primeira categoria. `mergeHooksIntoSettings` rodava a etapa de limpeza dentro do loop por categoria, então a segunda iteração apagava as entradas que a primeira tinha acabado de escrever.
+- Hook de migration agora dispara em `Write|Edit` em vez de só `Write`, cobrindo edição de migrations SQL existentes. Instalações da 1.2.0 são auto-migradas silenciosamente no próximo `claudiao hooks install` (apenas entradas gerenciadas pelo claudião são alteradas).
+
+### Added
+
+- `claudiao hooks uninstall --only <categorias>` — paridade com o `install`. Remove apenas as categorias informadas, preservando as demais e hooks de outros plugins.
+- Helper `parseOnlyFlag` em `src/lib/hooks.ts` compartilhado por install e uninstall (trim, lowercase, dedupe, validação de ids).
+- Helper `migrateClaudiaoHookMatchers` em `src/lib/hooks.ts` que realinha matchers desatualizados de instalações antigas com o valor canônico das `HOOK_CATEGORIES` atuais.
+
 ## [1.2.0] — 2026-04-18
 
 ### Added
@@ -56,7 +70,8 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Doctor com diagnóstico de instalação e symlinks.
 - Suporte a repo externo de agents/skills via `.claudiao.json` → `repoPath`.
 
-[Unreleased]: https://github.com/fanticheli/claudiao/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/fanticheli/claudiao/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/fanticheli/claudiao/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/fanticheli/claudiao/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/fanticheli/claudiao/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/fanticheli/claudiao/releases/tag/v1.0.0
