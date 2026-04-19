@@ -326,6 +326,28 @@ seu-repo/
 
 O claudião prioriza o repo externo sobre os templates bundled. `claudiao update` roda `git pull` + relink automaticamente. Isso é útil pra times que compartilham agentes/skills via Git.
 
+## Troubleshooting
+
+Se algum comando parece falhar sem dar detalhes (ex: `claudiao update` não linka nada novo, `claudiao init` pula um agente silenciosamente), rode com o flag `--verbose` pra ver decisões internas:
+
+```bash
+claudiao --verbose update          # decisões de path, symlinks, git pull
+claudiao -v doctor                 # checagens detalhadas
+CLAUDIAO_DEBUG=1 claudiao list     # via env var (útil em CI)
+```
+
+Saída em modo verbose (stderr, prefixo `[debug]`):
+
+```
+[debug] verbose mode ON (flag: --verbose)
+[debug] getExternalRepoPath: ignored unreadable /home/user/.claude/.claudiao.json (Unexpected end of JSON input)
+[debug] git pull error: fatal: not a git repository
+```
+
+O env var `CLAUDIAO_DEBUG=1` tem o mesmo efeito e sempre vence sobre `--verbose=false`, útil pra forçar logs em scripts CI sem mexer na invocação.
+
+Se o problema não aparece no verbose, rode `claudiao doctor` — ele valida instalação, symlinks quebrados e frontmatter de agents/skills.
+
 ## Fluxo completo: do zero ao uso
 
 ```bash
