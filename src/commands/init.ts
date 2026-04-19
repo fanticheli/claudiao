@@ -265,6 +265,9 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
             execSync(plugin.installCommand, { stdio: 'inherit' });
             success(`${plugin.name} instalado`);
           } catch (err) {
+            // expected: plugin install can fail (network, auth, upstream
+            // repo). Surface a manual retry hint and continue — the loop
+            // still offers the remaining plugins.
             error(`Falha ao instalar ${plugin.name}. Tente manualmente: ${plugin.installCommand}`);
             debug(`${plugin.installCommand} failed: ${err instanceof Error ? err.message : String(err)}`);
           }

@@ -164,6 +164,8 @@ export function doctor(): void {
           }
         }
       } catch (err) {
+        // expected: gray-matter throws on malformed YAML; surface as error so
+        // doctor still completes and counts it against the issue total
         error(`Agente ${agent}: falha ao parsear frontmatter (${err instanceof Error ? err.message : String(err)})`);
         issues++;
       }
@@ -208,6 +210,8 @@ export function doctor(): void {
           }
         }
       } catch (err) {
+        // expected: gray-matter throws on malformed YAML; surface as error so
+        // doctor still completes and counts it against the issue total
         error(`Skill ${skill.name}: falha ao parsear frontmatter (${err instanceof Error ? err.message : String(err)})`);
         issues++;
       }
