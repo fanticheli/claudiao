@@ -10,7 +10,7 @@ import { update } from './commands/update.js';
 import { installPlugin } from './commands/install-plugin.js';
 import { installHooks, uninstallHooks, listHooks } from './commands/hooks.js';
 import { getPackageVersion } from './lib/package-info.js';
-import { setVerbose, debug } from './lib/format.js';
+import { setVerbose, debug, error } from './lib/format.js';
 
 const program = new Command();
 
@@ -117,7 +117,7 @@ Exemplos:
   `)
   .action((type: string, name: string) => {
     if (type !== 'plugin') {
-      console.log(`Tipo "${type}" nao reconhecido. Use: claudiao install plugin <nome>`);
+      error(`Tipo "${type}" nao reconhecido. Use: claudiao install plugin <nome>`);
       return;
     }
     installPlugin(name);

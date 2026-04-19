@@ -4,7 +4,7 @@ import chalk from 'chalk';
 import inquirer from 'inquirer';
 import { CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, getAgentsSavePath } from '../lib/paths.js';
 import { removeSymlink, isSymlink } from '../lib/symlinks.js';
-import { banner, success, error, heading, warn, info } from '../lib/format.js';
+import { banner, success, error, heading, warn, info, dim, raw } from '../lib/format.js';
 
 export async function removeAgent(name: string, options?: { dryRun?: boolean }): Promise<void> {
   const dryRun = options?.dryRun ?? false;
@@ -13,14 +13,14 @@ export async function removeAgent(name: string, options?: { dryRun?: boolean }):
 
   if (dryRun) {
     info('[dry-run] Nenhuma alteracao sera feita');
-    console.log('');
+    raw('');
   }
 
   const symlinkPath = join(CLAUDE_AGENTS_DIR, `${name}.md`);
 
   if (!existsSync(symlinkPath)) {
     error(`Agente "${name}" nao encontrado em ~/.claude/agents/`);
-    console.log(chalk.dim('    Rode `claudiao list agents` pra ver os disponiveis.'));
+    dim('Rode `claudiao list agents` pra ver os disponiveis.');
     return;
   }
 
@@ -32,7 +32,7 @@ export async function removeAgent(name: string, options?: { dryRun?: boolean }):
   }]);
 
   if (!confirm) {
-    console.log(chalk.dim('  Cancelado.'));
+    raw(chalk.dim('  Cancelado.'));
     return;
   }
 
@@ -78,7 +78,7 @@ export async function removeAgent(name: string, options?: { dryRun?: boolean }):
     }
   }
 
-  console.log('');
+  raw('');
 }
 
 export async function removeSkill(name: string, options?: { dryRun?: boolean }): Promise<void> {
@@ -88,14 +88,14 @@ export async function removeSkill(name: string, options?: { dryRun?: boolean }):
 
   if (dryRun) {
     info('[dry-run] Nenhuma alteracao sera feita');
-    console.log('');
+    raw('');
   }
 
   const symlinkPath = join(CLAUDE_SKILLS_DIR, name);
 
   if (!existsSync(symlinkPath)) {
     error(`Skill "${name}" nao encontrada em ~/.claude/skills/`);
-    console.log(chalk.dim('    Rode `claudiao list skills` pra ver as disponiveis.'));
+    dim('Rode `claudiao list skills` pra ver as disponiveis.');
     return;
   }
 
@@ -107,7 +107,7 @@ export async function removeSkill(name: string, options?: { dryRun?: boolean }):
   }]);
 
   if (!confirm) {
-    console.log(chalk.dim('  Cancelado.'));
+    raw(chalk.dim('  Cancelado.'));
     return;
   }
 
@@ -128,5 +128,5 @@ export async function removeSkill(name: string, options?: { dryRun?: boolean }):
     }
   }
 
-  console.log('');
+  raw('');
 }
