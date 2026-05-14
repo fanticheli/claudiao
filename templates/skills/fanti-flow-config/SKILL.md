@@ -197,9 +197,10 @@ Transition: descobrir o ID equivalente a "Done" / "Concluído" / "Resolved" via 
 
 - **MCP Atlassian** configurado e autenticado:
   ```bash
-  claude mcp add --transport sse atlassian https://mcp.atlassian.com/v1/sse --scope user
+  claude mcp add --transport http atlassian https://mcp.atlassian.com/v1/mcp --scope user
   ```
   Depois autorizar via `/mcp` no Claude Code (OAuth no browser).
+  > O endpoint legado `/v1/sse` (SSE) será descontinuado em 30/jun/2026 — sempre use `/v1/mcp` (Streamable HTTP).
 - **MCP Slack** configurado (claude.ai Slack ou equivalente)
 
 ## Fluxo de descoberta inicial (rodar uma vez)
