@@ -3,8 +3,8 @@ import { mkdtempSync, writeFileSync, existsSync } from 'node:fs';
 import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { parseAgentFile, parseSkillFile, serializeAgent, serializeSkill } from '../frontmatter.js';
-import type { AgentMeta, SkillMeta } from '../../types.js';
+import { parseAgentFile, parseSkillFile, parseCommandFile, serializeAgent, serializeSkill, serializeCommand } from '../frontmatter.js';
+import type { AgentMeta, SkillMeta, CommandMeta } from '../../types.js';
 
 let tmpDir: string;
 
@@ -162,6 +162,77 @@ describe('serializeSkill', () => {
   });
 });
 
+describe('parseCommandFile', () => {
+  it('should parse all frontmatter fields from a command file', () => {
+    const dir = makeTmp();
+    const file = join(dir, 'bug.md');
+    writeFileSync(file, `---
+description: Cria card de bug no Jira
+argument-hint: <descricao>
+allowed-tools: Read, Bash, AskUserQuestion
+---
+
+Body do command.
+`);
+
+    const result = parseCommandFile(file);
+
+    expect(result.name).toBe('bug');
+    expect(result.description).toBe('Cria card de bug no Jira');
+    expect(result.argumentHint).toBe('<descricao>');
+    expect(result.allowedTools).toEqual(['Read', 'Bash', 'AskUserQuestion']);
+    expect(result.content).toContain('Body do command.');
+  });
+
+  it('should derive name from filename when not in frontmatter', () => {
+    const dir = makeTmp();
+    const file = join(dir, 'my-command.md');
+    writeFileSync(file, `---
+description: Sem name no frontmatter
+---
+
+Body.
+`);
+
+    const result = parseCommandFile(file);
+
+    expect(result.name).toBe('my-command');
+    expect(result.argumentHint).toBeUndefined();
+    expect(result.allowedTools).toEqual([]);
+  });
+});
+
+describe('serializeCommand', () => {
+  it('should produce valid markdown with frontmatter', () => {
+    const meta: CommandMeta = {
+      name: 'plan',
+      description: 'Quebra feature em epico + stories',
+      argumentHint: '<feature>',
+      allowedTools: ['Read', 'Bash'],
+    };
+
+    const output = serializeCommand(meta, '\nCommand body.\n');
+
+    expect(output).toContain('description: Quebra feature em epico + stories');
+    expect(output).toContain("argument-hint: <feature>");
+    expect(output).toContain("allowed-tools: 'Read, Bash'");
+    expect(output).toContain('Command body.');
+  });
+
+  it('should omit optional fields when empty', () => {
+    const meta: CommandMeta = {
+      name: 'simple',
+      description: 'Sem extras',
+      allowedTools: [],
+    };
+
+    const output = serializeCommand(meta, '\nBody.\n');
+
+    expect(output).not.toMatch(/^argument-hint:/m);
+    expect(output).not.toMatch(/^allowed-tools:/m);
+  });
+});
+
 describe('round-trip', () => {
   it('should serialize then parse an agent and get the same data back', () => {
     const dir = makeTmp();
@@ -209,5 +280,28 @@ describe('round-trip', () => {
     expect(parsed.allowedTools).toEqual(meta.allowedTools);
     expect(parsed.model).toBe(meta.model);
     expect(parsed.content).toContain('Skill instructions here.');
+  });
+
+  it('should serialize then parse a command and get the same data back', () => {
+    const dir = makeTmp();
+    const meta: CommandMeta = {
+      name: 'round-trip-cmd',
+      description: 'Round trip command test',
+      argumentHint: '<arg>',
+      allowedTools: ['Read', 'Bash'],
+    };
+    const body = '\nCommand instructions.\n';
+
+    const serialized = serializeCommand(meta, body);
+    const file = join(dir, 'round-trip-cmd.md');
+    writeFileSync(file, serialized);
+
+    const parsed = parseCommandFile(file);
+
+    expect(parsed.name).toBe(meta.name);
+    expect(parsed.description).toBe(meta.description);
+    expect(parsed.argumentHint).toBe(meta.argumentHint);
+    expect(parsed.allowedTools).toEqual(meta.allowedTools);
+    expect(parsed.content).toContain('Command instructions.');
   });
 });

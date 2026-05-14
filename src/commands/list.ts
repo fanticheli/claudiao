@@ -1,8 +1,8 @@
 import { readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import chalk from 'chalk';
-import { CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR } from '../lib/paths.js';
-import { parseAgentFile, parseSkillFile } from '../lib/frontmatter.js';
+import { CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, CLAUDE_COMMANDS_DIR } from '../lib/paths.js';
+import { parseAgentFile, parseSkillFile, parseCommandFile } from '../lib/frontmatter.js';
 import { isSymlink } from '../lib/symlinks.js';
 import { banner, heading, table, info } from '../lib/format.js';
 import { PLUGINS } from '../lib/plugins.js';
@@ -121,6 +121,44 @@ export function listSkills(): void {
   table(rows);
   console.log('');
   info(`${dirs.length} skills instaladas. Use digitando o comando no Claude Code.`);
+  console.log('');
+}
+
+export function listCommands(): void {
+  banner();
+  heading('Slash commands instalados');
+
+  if (!existsSync(CLAUDE_COMMANDS_DIR)) {
+    info('Nenhum slash command instalado. Rode `claudiao init` para instalar os bundled.');
+    return;
+  }
+
+  const files = readdirSync(CLAUDE_COMMANDS_DIR).filter(f => f.endsWith('.md'));
+
+  if (files.length === 0) {
+    info('Nenhum slash command instalado.');
+    return;
+  }
+
+  const rows = files.map(file => {
+    const filePath = join(CLAUDE_COMMANDS_DIR, file);
+    try {
+      const meta = parseCommandFile(filePath);
+      return {
+        name: '/' + meta.name,
+        description: meta.description.slice(0, 70),
+      };
+    } catch {
+      return {
+        name: '/' + file.replace('.md', ''),
+        description: chalk.dim('(erro ao ler frontmatter)'),
+      };
+    }
+  });
+
+  table(rows);
+  console.log('');
+  info(`${files.length} slash commands instalados. Use digitando o comando no Claude Code.`);
   console.log('');
 }
 

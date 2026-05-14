@@ -2,7 +2,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
 import chalk from 'chalk';
-import { CLAUDE_DIR, CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, CLAUDE_MD, CONFIG_FILE, getExternalRepoPath, getAgentsSource } from '../lib/paths.js';
+import { CLAUDE_DIR, CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, CLAUDE_COMMANDS_DIR, CLAUDE_MD, CONFIG_FILE, getExternalRepoPath, getAgentsSource } from '../lib/paths.js';
 import { isSymlink, getSymlinkTarget } from '../lib/symlinks.js';
 import { banner, success, warn, error, heading } from '../lib/format.js';
 
@@ -111,14 +111,41 @@ export function doctor(): void {
     issues++;
   }
 
-  // 6. Config file
+  // 6. Slash commands
+  if (existsSync(CLAUDE_COMMANDS_DIR)) {
+    const commands = readdirSync(CLAUDE_COMMANDS_DIR).filter(f => f.endsWith('.md'));
+    let broken = 0;
+
+    for (const cmd of commands) {
+      const cmdPath = join(CLAUDE_COMMANDS_DIR, cmd);
+      if (isSymlink(cmdPath)) {
+        const target = getSymlinkTarget(cmdPath);
+        if (!target || !existsSync(target)) {
+          error(`Command /${cmd.replace('.md', '')}: symlink quebrado → ${target}`);
+          broken++;
+        }
+      }
+    }
+
+    if (commands.length === 0) {
+      warn('Nenhum slash command instalado');
+    } else if (broken === 0) {
+      success(`${commands.length} slash commands instalados, todos OK`);
+    } else {
+      error(`${broken} command(s) com symlink quebrado`);
+      console.log(chalk.dim('    Rode: claudiao init (para reinstalar)'));
+      issues += broken;
+    }
+  }
+
+  // 7. Config file
   if (existsSync(CONFIG_FILE)) {
     success('Config claudiao OK');
   } else {
     warn('Config claudiao nao encontrado (nao e obrigatorio)');
   }
 
-  // 7. Repo path
+  // 8. Repo path
   const repoPath = getExternalRepoPath();
   if (repoPath) {
     success(`Repo externo de agentes/skills: ${chalk.dim(repoPath)}`);

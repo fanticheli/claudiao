@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process';
 import { existsSync, readdirSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import chalk from 'chalk';
-import { getExternalRepoPath, getAgentsSource, getSkillsSource, CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR } from '../lib/paths.js';
+import { getExternalRepoPath, getAgentsSource, getSkillsSource, getCommandsSource, CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, CLAUDE_COMMANDS_DIR } from '../lib/paths.js';
 import { createSymlink, ensureDir, isSymlink, getSymlinkTarget } from '../lib/symlinks.js';
 import { banner, success, warn, error, heading, info } from '../lib/format.js';
 
@@ -116,13 +116,53 @@ export function update(options?: { force?: boolean; dryRun?: boolean }): void {
     }
   }
 
+  // Re-link new slash commands
+  const commandsSource = getCommandsSource();
+  if (commandsSource && existsSync(commandsSource)) {
+    heading(force ? 'Re-linkando todos os slash commands...' : 'Verificando novos slash commands...');
+    ensureDir(CLAUDE_COMMANDS_DIR);
+
+    const commandFiles = readdirSync(commandsSource).filter(f => f.endsWith('.md'));
+    let newCommands = 0;
+    let relinkedCommands = 0;
+
+    for (const file of commandFiles) {
+      const source = join(commandsSource, file);
+      const target = join(CLAUDE_COMMANDS_DIR, file);
+
+      if (!existsSync(target)) {
+        if (dryRun) {
+          info(`[dry-run] Linkaria novo command: /${file.replace('.md', '')}`);
+        } else {
+          createSymlink(source, target);
+          success(`Novo command: /${file.replace('.md', '')}`);
+        }
+        newCommands++;
+      } else if (force) {
+        if (dryRun) {
+          info(`[dry-run] Re-linkaria: /${file.replace('.md', '')}`);
+        } else {
+          createSymlink(source, target);
+          info(`Re-linkado: /${file.replace('.md', '')}`);
+        }
+        relinkedCommands++;
+      }
+    }
+
+    if (newCommands === 0 && relinkedCommands === 0) {
+      info('Nenhum command novo');
+    }
+  }
+
   // Clean orphan symlinks
   heading('Verificando symlinks orfaos...');
   let orphans = 0;
 
-  if (existsSync(CLAUDE_AGENTS_DIR)) {
-    for (const file of readdirSync(CLAUDE_AGENTS_DIR)) {
-      const filePath = join(CLAUDE_AGENTS_DIR, file);
+  const dirsToScan = [CLAUDE_AGENTS_DIR, CLAUDE_COMMANDS_DIR];
+  for (const dir of dirsToScan) {
+    if (!existsSync(dir)) continue;
+    for (const file of readdirSync(dir)) {
+      const filePath = join(dir, file);
       if (isSymlink(filePath)) {
         const target = getSymlinkTarget(filePath);
         const resolvedTarget = target ? resolve(dirname(filePath), target) : null;

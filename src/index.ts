@@ -6,9 +6,9 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { init } from './commands/init.js';
 import { createAgent, createSkill } from './commands/create.js';
-import { listAgents, listSkills, listPlugins } from './commands/list.js';
+import { listAgents, listSkills, listCommands, listPlugins } from './commands/list.js';
 import { doctor } from './commands/doctor.js';
-import { removeAgent, removeSkill } from './commands/remove.js';
+import { removeAgent, removeSkill, removeCommand } from './commands/remove.js';
 import { update } from './commands/update.js';
 import { installPlugin } from './commands/install-plugin.js';
 
@@ -83,9 +83,16 @@ list
 
 list
   .command('skills')
-  .description('Lista todas as skills instaladas (slash commands)')
+  .description('Lista todas as skills instaladas')
   .action(() => {
     listSkills();
+  });
+
+list
+  .command('commands')
+  .description('Lista todos os slash commands instalados (~/.claude/commands/)')
+  .action(() => {
+    listCommands();
   });
 
 list
@@ -138,6 +145,14 @@ remove
   .option('--dry-run', 'Mostra o que seria feito sem executar')
   .action(async (name: string, options: { dryRun?: boolean }) => {
     await removeSkill(name, options);
+  });
+
+remove
+  .command('command <name>')
+  .description('Remove um slash command instalado')
+  .option('--dry-run', 'Mostra o que seria feito sem executar')
+  .action(async (name: string, options: { dryRun?: boolean }) => {
+    await removeCommand(name, options);
   });
 
 // ============================================================
