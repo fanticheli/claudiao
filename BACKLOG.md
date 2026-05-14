@@ -70,6 +70,21 @@
 - `claudiao list agents` mostra status (ativo/inativo)
 - Persistir estado no `.claudiao.json`
 
+### FEAT-006: Suporte a slash commands (templates/commands/)
+**Descrição:** Estender o CLI pra gerenciar slash commands customizados (`~/.claude/commands/`) além de agents e skills.
+**Motivação:** Slash commands são uma feature poderosa do Claude Code (CLI). O bundle `fanti-flow` (`/bug`, `/bug-close`, `/eod`, `/plan`) já mora em `templates/commands/` mas o `init`/`doctor`/`list`/`remove`/`update` não os enxergam — precisam ser symlinkados manualmente.
+**Escopo:**
+- `lib/paths.ts`: adicionar `CLAUDE_COMMANDS_DIR` e `getBundledCommandsDir()`
+- `lib/symlinks.ts`: estender pra linkar `templates/commands/*.md` em `~/.claude/commands/`
+- `commands/init.ts`: instalar commands junto com agents/skills (com seleção via FEAT-004)
+- `commands/list.ts`: listar commands com badge "command"
+- `commands/doctor.ts`: validar symlinks de commands
+- `commands/remove.ts`: suportar `claudiao remove command <name>`
+- `commands/update.ts`: linkar commands novos
+- `commands/create.ts`: suportar `claudiao create command <name>` (scaffolding)
+- Testes em `lib/__tests__/symlinks.test.ts` cobrindo commands
+- Atualizar README com nova categoria "Slash Commands"
+
 ---
 
 ## P2 — Melhorias de médio prazo
