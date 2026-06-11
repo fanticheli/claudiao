@@ -2,7 +2,7 @@ import { existsSync, copyFileSync, chmodSync } from 'node:fs';
 import { join } from 'node:path';
 import { CLAUDE_DIR, getTemplatesPath } from './paths.js';
 import { ensureDir } from './symlinks.js';
-import { readSettings, writeSettings, SETTINGS_FILE } from './hooks.js';
+import { readSettings, readSettingsForWrite, writeSettings, SETTINGS_FILE } from './hooks.js';
 
 export { SETTINGS_FILE };
 
@@ -50,7 +50,7 @@ export function buildStatuslineEntry(): StatusLineConfig {
 }
 
 export function writeStatuslineIntoSettings(entry: StatusLineConfig): void {
-  const settings = readSettings() as SettingsWithStatusLine;
+  const settings = readSettingsForWrite() as SettingsWithStatusLine;
   settings.statusLine = entry;
   writeSettings(settings);
 }
@@ -62,7 +62,7 @@ export function writeStatuslineIntoSettings(entry: StatusLineConfig): void {
  * entries.
  */
 export function removeStatuslineFromSettings(): { removed: boolean; reason: string | null } {
-  const settings = readSettings() as SettingsWithStatusLine;
+  const settings = readSettingsForWrite() as SettingsWithStatusLine;
   const current = settings.statusLine;
   if (!current) {
     return { removed: false, reason: 'nenhuma statusLine configurada' };

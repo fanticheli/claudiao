@@ -67,6 +67,19 @@ export interface LinkResult {
   status: 'created' | 'updated' | 'skipped' | 'backup';
 }
 
+/**
+ * Backups from earlier installs (or a user file that happens to be named
+ * `X.bak`) must never be overwritten — that would destroy the only copy
+ * of the user's original file. Falls back to `.bak.1`, `.bak.2`, …
+ */
+function nextFreeBackupPath(target: string): string {
+  const base = target + '.bak';
+  if (!existsSync(base)) return base;
+  let n = 1;
+  while (existsSync(`${base}.${n}`)) n++;
+  return `${base}.${n}`;
+}
+
 export function createSymlink(source: string, target: string): LinkResult {
   ensureDir(dirname(target));
   const linkPath = buildLinkPath(source, target);
@@ -96,7 +109,7 @@ export function createSymlink(source: string, target: string): LinkResult {
   }
 
   if (existsSync(target)) {
-    renameSync(target, target + '.bak');
+    renameSync(target, nextFreeBackupPath(target));
     symlinkSync(linkPath, target);
     return { status: 'backup' };
   }
