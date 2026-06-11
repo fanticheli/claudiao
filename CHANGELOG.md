@@ -7,6 +7,16 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Added
+
+- **Gestão de slash commands** (`~/.claude/commands/`): `claudiao init` ganha o passo `[4/4] Slash Commands`, `claudiao list commands`, `claudiao remove command <nome>`, relink no `claudiao update` (incluindo limpeza de órfãos) e diagnóstico no `claudiao doctor` (symlinks quebrados + validação de frontmatter). Mesma estratégia dos agents: symlink com cascata repo externo > bundled. Retrabalho da PR #8 sobre a base da v1.5.x. Não há commands bundled — a fonte típica é o diretório `commands/` do repo externo.
+- `parseCommandFile`/`serializeCommand` em `lib/frontmatter.ts` e `validateCommandFrontmatter` em `lib/validate-frontmatter.ts` — `name` é derivado do filename (commands não exigem `name:` no frontmatter); `description` ausente é erro.
+- 24 testes novos: round-trip de commands, cascata `getCommandsSource` (com `homedir` sandboxed), validação, e `removeCommand` (primeiro teste de comando com fluxo interativo mockado).
+
+### Fixed
+
+- **`parseAgentFile`/`parseSkillFile` quebravam com `tools`/`allowed-tools` em array YAML** (`TypeError: split is not a function`) — formato que o validador já aceitava desde a 1.3.2 e o Claude Code suporta. Parser agora normaliza CSV string ou array.
+
 ## [1.5.1] — 2026-06-11
 
 Patch de segurança de dados: corrige três cenários em que o claudião podia destruir arquivos ou configurações do usuário em `~/.claude/`.

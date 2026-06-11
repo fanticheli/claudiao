@@ -2,7 +2,7 @@ import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
-import { CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, getAgentsSavePath } from '../lib/paths.js';
+import { CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, CLAUDE_COMMANDS_DIR, getAgentsSavePath, getCommandsSavePath } from '../lib/paths.js';
 import { removeSymlink, isSymlink } from '../lib/symlinks.js';
 import { banner, success, error, heading, warn, info, dim, raw } from '../lib/format.js';
 import { dryRunnable } from '../lib/dry-run.js';
@@ -54,6 +54,77 @@ export async function removeAgent(name: string, options?: { dryRun?: boolean }):
 
   // Ask if should also remove source
   const savePath = getAgentsSavePath();
+  if (savePath) {
+    const sourcePath = join(savePath, `${name}.md`);
+    if (existsSync(sourcePath)) {
+      if (dryRun) {
+        info(`[dry-run] Perguntaria se quer remover fonte: ${sourcePath}`);
+      } else {
+        const { removeSource } = await inquirer.prompt([{
+          type: 'confirm',
+          name: 'removeSource',
+          message: 'Remover tambem o arquivo fonte do repositorio?',
+          default: false,
+        }]);
+
+        if (removeSource) {
+          rmSync(sourcePath);
+          success(`Fonte removido: ${sourcePath}`);
+        }
+      }
+    }
+  }
+
+  raw('');
+}
+
+export async function removeCommand(name: string, options?: { dryRun?: boolean }): Promise<void> {
+  const dryRun = options?.dryRun ?? false;
+  banner();
+  heading(`Remover slash command: /${name}`);
+
+  if (dryRun) {
+    info('[dry-run] Nenhuma alteracao sera feita');
+    raw('');
+  }
+
+  const symlinkPath = join(CLAUDE_COMMANDS_DIR, `${name}.md`);
+
+  if (!existsSync(symlinkPath)) {
+    error(`Command "/${name}" nao encontrado em ~/.claude/commands/`);
+    dim('Rode `claudiao list commands` pra ver os disponiveis.');
+    return;
+  }
+
+  const { confirm } = await inquirer.prompt([{
+    type: 'confirm',
+    name: 'confirm',
+    message: `Remover command "/${name}"?`,
+    default: false,
+  }]);
+
+  if (!confirm) {
+    raw(chalk.dim('  Cancelado.'));
+    return;
+  }
+
+  const isLink = isSymlink(symlinkPath);
+  const dryRemoveMsg = isLink
+    ? `Removeria symlink: ~/.claude/commands/${name}.md`
+    : `Removeria arquivo: ~/.claude/commands/${name}.md`;
+
+  dryRunnable({ dryRun }, () => {
+    const removed = removeSymlink(symlinkPath);
+    if (removed) {
+      success(`Symlink removido: ~/.claude/commands/${name}.md`);
+    } else {
+      rmSync(symlinkPath);
+      success(`Arquivo removido: ~/.claude/commands/${name}.md`);
+    }
+  }, dryRemoveMsg);
+
+  // Ask if should also remove source
+  const savePath = getCommandsSavePath();
   if (savePath) {
     const sourcePath = join(savePath, `${name}.md`);
     if (existsSync(sourcePath)) {

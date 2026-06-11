@@ -1,8 +1,8 @@
 import { readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import chalk from 'chalk';
-import { CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, PACKAGE_ROOT } from '../lib/paths.js';
-import { parseAgentFile, parseSkillFile } from '../lib/frontmatter.js';
+import { CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, CLAUDE_COMMANDS_DIR, PACKAGE_ROOT } from '../lib/paths.js';
+import { parseAgentFile, parseSkillFile, parseCommandFile } from '../lib/frontmatter.js';
 import { getInstallSource } from '../lib/symlinks.js';
 import { banner, heading, table, info, raw, debug } from '../lib/format.js';
 
@@ -132,6 +132,50 @@ export function listSkills(): void {
   table(rows);
   raw('');
   info(`${dirs.length} skills instaladas. Use digitando o comando no Claude Code.`);
+  raw('');
+}
+
+export function listCommands(): void {
+  banner();
+  heading('Slash commands instalados');
+
+  if (!existsSync(CLAUDE_COMMANDS_DIR)) {
+    info('Nenhum slash command instalado. Rode `claudiao init` ou adicione commands/ no repo externo.');
+    return;
+  }
+
+  const files = readdirSync(CLAUDE_COMMANDS_DIR).filter(f => f.endsWith('.md'));
+
+  if (files.length === 0) {
+    info('Nenhum slash command instalado.');
+    return;
+  }
+
+  const rows = files.map(file => {
+    const filePath = join(CLAUDE_COMMANDS_DIR, file);
+    const source = getInstallSource(filePath, PACKAGE_ROOT);
+    try {
+      const meta = parseCommandFile(filePath);
+      return {
+        name: '/' + meta.name,
+        description: meta.description.slice(0, 70),
+        source,
+      };
+    } catch (err) {
+      // expected: malformed frontmatter — doctor surfaces the real issue.
+      // Keep the row visible so the user still sees the file exists.
+      debug(`list parseCommandFile(${file}) failed: ${err instanceof Error ? err.message : String(err)}`);
+      return {
+        name: '/' + file.replace('.md', ''),
+        description: chalk.dim('(erro ao ler frontmatter)'),
+        source,
+      };
+    }
+  });
+
+  table(rows);
+  raw('');
+  info(`${files.length} slash commands instalados. Use digitando o comando no Claude Code.`);
   raw('');
 }
 
