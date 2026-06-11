@@ -13,6 +13,8 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - `parseCommandFile`/`serializeCommand` em `lib/frontmatter.ts` e `validateCommandFrontmatter` em `lib/validate-frontmatter.ts` — `name` é derivado do filename (commands não exigem `name:` no frontmatter); `description` ausente é erro.
 - 24 testes novos: round-trip de commands, cascata `getCommandsSource` (com `homedir` sandboxed), validação, e `removeCommand` (primeiro teste de comando com fluxo interativo mockado).
 
+- **Bundle fanti-flow** (retrabalho da PR #7): primeiro conjunto de slash commands bundled — `/bug`, `/bug-close`, `/eod` e `/plan` (fluxo Jira+Slack com preview + approval obrigatório antes de qualquer escrita), agente orquestrador `daily-reporter` e skill de configuração `fanti-flow-config`. Requer MCPs Atlassian (`/v1/mcp`, Streamable HTTP) e Slack autenticados. Tudo que o fluxo cria leva a label `auto-fanti-flow` para rastreabilidade.
+
 ### Fixed
 
 - **`parseAgentFile`/`parseSkillFile` quebravam com `tools`/`allowed-tools` em array YAML** (`TypeError: split is not a function`) — formato que o validador já aceitava desde a 1.3.2 e o Claude Code suporta. Parser agora normaliza CSV string ou array.
