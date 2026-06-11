@@ -13,6 +13,13 @@ export interface SkillMeta {
   model: string;
 }
 
+export interface CommandMeta {
+  name: string;
+  description: string;
+  argumentHint?: string;
+  allowedTools: string[];
+}
+
 export interface ClaudiaoConfig {
   repoPath?: string;
   installedAt: string;

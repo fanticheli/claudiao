@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { basename } from 'node:path';
 import matter from 'gray-matter';
 
 export type Severity = 'error' | 'warn';
@@ -112,6 +113,40 @@ export function validateSkillFrontmatter(filePath: string): ValidationResult {
 
   if (!data.model) {
     issues.push({ field: 'model', severity: 'warn', message: 'campo `model` ausente (default: sonnet)' });
+  }
+
+  return { file: filePath, name, issues };
+}
+
+/**
+ * Validates a slash command's frontmatter. Commands don't require `name`
+ * (Claude Code derives it from the filename), so only `description` is
+ * mandatory; `allowed-tools` and `argument-hint` are optional.
+ */
+export function validateCommandFrontmatter(filePath: string): ValidationResult {
+  const raw = readFileSync(filePath, 'utf-8');
+  const { data } = matter(raw);
+  const issues: FrontmatterIssue[] = [];
+  const name = typeof data.name === 'string' && data.name.trim() !== ''
+    ? data.name
+    : basename(filePath, '.md');
+
+  if (!data.description || typeof data.description !== 'string') {
+    issues.push({ field: 'description', severity: 'error', message: 'campo `description` ausente' });
+  } else if (data.description.length < MIN_DESCRIPTION_LENGTH) {
+    issues.push({
+      field: 'description',
+      severity: 'warn',
+      message: `description muito curta (${data.description.length} chars, mínimo ${MIN_DESCRIPTION_LENGTH})`,
+    });
+  }
+
+  if (data['allowed-tools'] && typeof data['allowed-tools'] !== 'string' && !isStringArray(data['allowed-tools'])) {
+    issues.push({
+      field: 'allowed-tools',
+      severity: 'error',
+      message: 'campo `allowed-tools` deve ser string CSV ou array de strings',
+    });
   }
 
   return { file: filePath, name, issues };

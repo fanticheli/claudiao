@@ -2,12 +2,13 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
 import chalk from 'chalk';
-import { CLAUDE_DIR, CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, CLAUDE_MD, CONFIG_FILE, getExternalRepoPath, getAgentsSource } from '../lib/paths.js';
+import { CLAUDE_DIR, CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, CLAUDE_COMMANDS_DIR, CLAUDE_MD, CONFIG_FILE, getExternalRepoPath, getAgentsSource } from '../lib/paths.js';
 import { isSymlink, getSymlinkTarget, isSymlinkBroken, resolveSymlinkTarget } from '../lib/symlinks.js';
 import { banner, success, warn, error, heading, dim, raw, debug } from '../lib/format.js';
 import {
   validateAgentFrontmatter,
   validateSkillFrontmatter,
+  validateCommandFrontmatter,
   hasErrors,
   hasWarnings,
 } from '../lib/validate-frontmatter.js';
@@ -119,14 +120,38 @@ export function doctor(): void {
     issues++;
   }
 
-  // 6. Config file
+  // 6. Slash commands (optional — only checked when the dir exists)
+  if (existsSync(CLAUDE_COMMANDS_DIR)) {
+    const commands = readdirSync(CLAUDE_COMMANDS_DIR).filter(f => f.endsWith('.md'));
+    let broken = 0;
+
+    for (const cmd of commands) {
+      const cmdPath = join(CLAUDE_COMMANDS_DIR, cmd);
+      if (isSymlink(cmdPath) && isSymlinkBroken(cmdPath)) {
+        error(`Command /${cmd.replace('.md', '')}: symlink quebrado → ${getSymlinkTarget(cmdPath)}`);
+        broken++;
+      }
+    }
+
+    if (commands.length === 0) {
+      dim('Nenhum slash command instalado (opcional).');
+    } else if (broken === 0) {
+      success(`${commands.length} slash commands instalados, todos OK`);
+    } else {
+      error(`${broken} command(s) com symlink quebrado`);
+      dim('Rode: claudiao update --force (para re-linkar)');
+      issues += broken;
+    }
+  }
+
+  // 7. Config file
   if (existsSync(CONFIG_FILE)) {
     success('Config claudiao OK');
   } else {
     warn('Config claudiao nao encontrado (nao e obrigatorio)');
   }
 
-  // 7. Repo path
+  // 8. Repo path
   const repoPath = getExternalRepoPath();
   if (repoPath) {
     success(`Repo externo de agentes/skills: ${chalk.dim(repoPath)}`);
@@ -141,7 +166,7 @@ export function doctor(): void {
 
   const MAX_WARNINGS_SHOWN = 3;
 
-  // 8. Frontmatter validation (agents)
+  // 9. Frontmatter validation (agents)
   if (existsSync(CLAUDE_AGENTS_DIR)) {
     const agents = readdirSync(CLAUDE_AGENTS_DIR).filter((f) => f.endsWith('.md'));
     let errorCount = 0;
@@ -186,7 +211,7 @@ export function doctor(): void {
     }
   }
 
-  // 9. Frontmatter validation (skills)
+  // 10. Frontmatter validation (skills)
   if (existsSync(CLAUDE_SKILLS_DIR)) {
     const skills = readdirSync(CLAUDE_SKILLS_DIR, { withFileTypes: true }).filter(
       (d) => d.isDirectory() || d.isSymbolicLink(),
@@ -232,7 +257,52 @@ export function doctor(): void {
     }
   }
 
-  // 10. Statusline
+  // 11. Frontmatter validation (commands)
+  if (existsSync(CLAUDE_COMMANDS_DIR)) {
+    const commands = readdirSync(CLAUDE_COMMANDS_DIR).filter((f) => f.endsWith('.md'));
+    let errorCount = 0;
+    let warnCount = 0;
+    let warnsShown = 0;
+
+    for (const cmd of commands) {
+      const cmdPath = join(CLAUDE_COMMANDS_DIR, cmd);
+      const realPath = isSymlink(cmdPath) ? resolveSymlinkTarget(cmdPath) : cmdPath;
+      if (!realPath || !existsSync(realPath)) continue;
+
+      try {
+        const result = validateCommandFrontmatter(realPath);
+        if (hasErrors(result)) {
+          errorCount++;
+          const errs = result.issues.filter((i) => i.severity === 'error');
+          error(`Command /${result.name || cmd.replace('.md', '')}: ${errs.map((i) => i.message).join('; ')}`);
+          issues++;
+        } else if (hasWarnings(result)) {
+          warnCount++;
+          if (warnsShown < MAX_WARNINGS_SHOWN) {
+            const warns = result.issues.filter((i) => i.severity === 'warn');
+            warn(`Command /${result.name}: ${warns.map((i) => i.message).join('; ')}`);
+            warnsShown++;
+          }
+        }
+      } catch (err) {
+        // expected: gray-matter throws on malformed YAML; surface as error so
+        // doctor still completes and counts it against the issue total
+        error(`Command ${cmd}: falha ao parsear frontmatter (${err instanceof Error ? err.message : String(err)})`);
+        issues++;
+      }
+    }
+
+    if (commands.length > 0 && errorCount === 0 && warnCount === 0) {
+      success('Frontmatter de todos os commands OK');
+    } else if (commands.length > 0 && errorCount === 0) {
+      if (warnCount > MAX_WARNINGS_SHOWN) {
+        dim(`... e mais ${warnCount - MAX_WARNINGS_SHOWN} command(s) com avisos`);
+      }
+      warn(`${warnCount} command(s) com avisos de frontmatter`);
+    }
+  }
+
+  // 12. Statusline
   const statuslineEntry = getInstalledStatusline();
   if (!statuslineEntry) {
     dim('Statusline nao configurada (opcional).');
