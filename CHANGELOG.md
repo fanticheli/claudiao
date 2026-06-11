@@ -7,6 +7,10 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-06-11
+
+Slash commands como terceiro tipo de artefato gerenciado + primeiro bundle de commands (fanti-flow).
+
 ### Added
 
 - **Gestão de slash commands** (`~/.claude/commands/`): `claudiao init` ganha o passo `[4/4] Slash Commands`, `claudiao list commands`, `claudiao remove command <nome>`, relink no `claudiao update` (incluindo limpeza de órfãos) e diagnóstico no `claudiao doctor` (symlinks quebrados + validação de frontmatter). Mesma estratégia dos agents: symlink com cascata repo externo > bundled. Retrabalho da PR #8 sobre a base da v1.5.x. Não há commands bundled — a fonte típica é o diretório `commands/` do repo externo.
