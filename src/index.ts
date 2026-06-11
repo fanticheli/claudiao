@@ -3,9 +3,9 @@
 import { Command } from 'commander';
 import { init } from './commands/init.js';
 import { createAgent, createSkill } from './commands/create.js';
-import { listAgents, listSkills } from './commands/list.js';
+import { listAgents, listSkills, listCommands } from './commands/list.js';
 import { doctor } from './commands/doctor.js';
-import { removeAgent, removeSkill } from './commands/remove.js';
+import { removeAgent, removeSkill, removeCommand } from './commands/remove.js';
 import { update } from './commands/update.js';
 import { installPlugin } from './commands/install-plugin.js';
 import { installHooks, uninstallHooks, listHooks } from './commands/hooks.js';
@@ -36,7 +36,7 @@ program
 // ============================================================
 program
   .command('init')
-  .description('Configura tudo: instala agentes, skills, CLAUDE.md global e plugins opcionais')
+  .description('Configura tudo: instala agentes, skills, slash commands e CLAUDE.md global')
   .option('--dry-run', 'Mostra o que seria feito sem executar')
   .action(async (options: { dryRun?: boolean }) => {
     await init(options);
@@ -91,9 +91,16 @@ list
 
 list
   .command('skills')
-  .description('Lista todas as skills instaladas (slash commands)')
+  .description('Lista todas as skills instaladas')
   .action(() => {
     listSkills();
+  });
+
+list
+  .command('commands')
+  .description('Lista todos os slash commands instalados (~/.claude/commands/)')
+  .action(() => {
+    listCommands();
   });
 
 // ============================================================
@@ -129,6 +136,14 @@ remove
   .option('--dry-run', 'Mostra o que seria feito sem executar')
   .action(async (name: string, options: { dryRun?: boolean }) => {
     await removeSkill(name, options);
+  });
+
+remove
+  .command('command <name>')
+  .description('Remove um slash command instalado')
+  .option('--dry-run', 'Mostra o que seria feito sem executar')
+  .action(async (name: string, options: { dryRun?: boolean }) => {
+    await removeCommand(name, options);
   });
 
 // ============================================================
