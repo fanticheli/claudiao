@@ -107,6 +107,41 @@ describe('createSymlink', () => {
     expect(readFileSync(target, 'utf-8')).toBe('new');
   });
 
+  it('should not overwrite a pre-existing .bak — uses .bak.1 for the new backup', () => {
+    const dir = makeTmp();
+    const source = join(dir, 'source.md');
+    const target = join(dir, 'target.md');
+    writeFileSync(source, 'new content');
+    writeFileSync(target, 'current user file');
+    writeFileSync(target + '.bak', 'older backup, must survive');
+
+    const result = createSymlink(source, target);
+
+    expect(result.status).toBe('backup');
+    expect(isSymlink(target)).toBe(true);
+    // the old backup is untouched
+    expect(readFileSync(target + '.bak', 'utf-8')).toBe('older backup, must survive');
+    // the current user file went to the next free slot
+    expect(readFileSync(target + '.bak.1', 'utf-8')).toBe('current user file');
+  });
+
+  it('should cascade to .bak.2 when .bak and .bak.1 are both taken', () => {
+    const dir = makeTmp();
+    const source = join(dir, 'source.md');
+    const target = join(dir, 'target.md');
+    writeFileSync(source, 'new content');
+    writeFileSync(target, 'current user file');
+    writeFileSync(target + '.bak', 'backup zero');
+    writeFileSync(target + '.bak.1', 'backup one');
+
+    const result = createSymlink(source, target);
+
+    expect(result.status).toBe('backup');
+    expect(readFileSync(target + '.bak', 'utf-8')).toBe('backup zero');
+    expect(readFileSync(target + '.bak.1', 'utf-8')).toBe('backup one');
+    expect(readFileSync(target + '.bak.2', 'utf-8')).toBe('current user file');
+  });
+
   it('should backup a non-symlink file before creating symlink (status: backup)', () => {
     const dir = makeTmp();
     const source = join(dir, 'source.md');

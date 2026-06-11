@@ -11,6 +11,7 @@ import { installPlugin } from './commands/install-plugin.js';
 import { installHooks, uninstallHooks, listHooks } from './commands/hooks.js';
 import { installStatusline, uninstallStatusline, listStatusline } from './commands/statusline.js';
 import { getPackageVersion } from './lib/package-info.js';
+import { MalformedSettingsError } from './lib/hooks.js';
 import { setVerbose, debug } from './lib/format.js';
 
 const program = new Command();
@@ -234,6 +235,7 @@ try {
   await program.parseAsync();
 } catch (err) {
   const message = err instanceof Error ? err.message : String(err);
-  console.error(`\n  \x1b[31m✗\x1b[0m Erro inesperado: ${message}\n`);
+  const prefix = err instanceof MalformedSettingsError ? 'Erro' : 'Erro inesperado';
+  console.error(`\n  \x1b[31m✗\x1b[0m ${prefix}: ${message}\n`);
   process.exit(1);
 }
