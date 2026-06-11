@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, rmSync, writeFileSync, chmodSync, copyFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync, chmodSync, copyFileSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { CLAUDE_DIR, getTemplatesPath } from './paths.js';
 import { ensureDir } from './symlinks.js';
@@ -138,21 +138,50 @@ export function findCategoryByScript(scriptPath: string): HookCategory | null {
   );
 }
 
+export class MalformedSettingsError extends Error {
+  constructor() {
+    super(
+      `${SETTINGS_FILE} existe mas contém JSON inválido. ` +
+        'Corrija (ou remova) o arquivo antes de continuar — sobrescrevê-lo apagaria suas configurações.',
+    );
+    this.name = 'MalformedSettingsError';
+  }
+}
+
 export function readSettings(): SettingsJson {
   if (!existsSync(SETTINGS_FILE)) return {};
   try {
     return JSON.parse(readFileSync(SETTINGS_FILE, 'utf-8')) as SettingsJson;
   } catch {
     // expected: settings.json may be partially written or malformed by
-    // another tool. Starting from empty avoids crashing the hooks
-    // install flow; claudiao will merge its entries into a fresh object.
+    // another tool. Read-only flows (list, doctor) degrade to empty
+    // instead of crashing. Write flows MUST use readSettingsForWrite.
     return {};
+  }
+}
+
+/**
+ * Like readSettings, but for read→modify→write flows: a malformed
+ * settings.json aborts with MalformedSettingsError instead of returning
+ * `{}` — otherwise the subsequent write would replace the user's entire
+ * config (other plugins' hooks, permissions, env) with only claudiao's.
+ */
+export function readSettingsForWrite(): SettingsJson {
+  if (!existsSync(SETTINGS_FILE)) return {};
+  try {
+    return JSON.parse(readFileSync(SETTINGS_FILE, 'utf-8')) as SettingsJson;
+  } catch {
+    throw new MalformedSettingsError();
   }
 }
 
 export function writeSettings(settings: SettingsJson): void {
   ensureDir(CLAUDE_DIR);
-  writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2) + '\n');
+  // Atomic replace: a write interrupted halfway must never leave
+  // settings.json truncated. rename() within the same dir is atomic.
+  const tmp = `${SETTINGS_FILE}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify(settings, null, 2) + '\n');
+  renameSync(tmp, SETTINGS_FILE);
 }
 
 /**
@@ -187,7 +216,7 @@ export function copyHookScripts(categories: HookCategory[]): string[] {
  * entries written by pre-1.2 versions of claudiao.
  */
 export function mergeHooksIntoSettings(categories: HookCategory[]): SettingsJson {
-  const settings = readSettings();
+  const settings = readSettingsForWrite();
   settings.hooks = settings.hooks ?? {};
 
   const categoryScripts = new Set(
@@ -248,7 +277,7 @@ export function mergeHooksIntoSettings(categories: HookCategory[]): SettingsJson
  * rewritten to the current canonical value.
  */
 export function migrateClaudiaoHookMatchers(): number {
-  const settings = readSettings();
+  const settings = readSettingsForWrite();
   if (!settings.hooks) return 0;
 
   let migrated = 0;
@@ -325,7 +354,7 @@ export function migrateClaudiaoHookMatchers(): number {
 export function removeClaudiaoHooks(
   onlyCategories?: string[],
 ): { removedCount: number; categoriesRemoved: string[] } {
-  const settings = readSettings();
+  const settings = readSettingsForWrite();
   if (!settings.hooks) return { removedCount: 0, categoriesRemoved: [] };
 
   const filterSet = onlyCategories && onlyCategories.length > 0 ? new Set(onlyCategories) : null;
