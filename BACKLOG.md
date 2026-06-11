@@ -156,6 +156,10 @@ _Concluído. Scripts agora em `.mjs`, testes de integração com `spawnSync`, cl
 
 _FEAT-021 e FEAT-022 foram concluídas em 1.1.0 — ver seção "✅ Resolvido" no topo._
 
+### FEAT-032: Suporte a slash commands (templates/commands/) — ✅ resolvido (PR #10, v1.6.0)
+**Descrição:** CLI gerencia slash commands (`~/.claude/commands/`) além de agents e skills: `init` (passo [4/4]), `list commands`, `remove command`, relink + órfãos no `update`, diagnóstico no `doctor`, validação de frontmatter. Mesma cascata external > bundled.
+**Restante:** `claudiao create command <name>` (scaffolding) não foi incluído — sem caso de uso até o bundle fanti-flow estabilizar.
+
 ---
 
 ## P2 — Melhorias de médio prazo
