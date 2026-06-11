@@ -7,6 +7,10 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.5.1] — 2026-06-11
+
+Patch de segurança de dados: corrige três cenários em que o claudião podia destruir arquivos ou configurações do usuário em `~/.claude/`.
+
 ### Fixed
 
 - **Perda de backup em `createSymlink`**: instalar por cima de um arquivo real quando já existia um `X.bak` (de uma instalação anterior, ou um arquivo legítimo do usuário) sobrescrevia o backup silenciosamente. Agora o backup novo cai no próximo slot livre (`X.bak.1`, `X.bak.2`, …) e o `.bak` existente nunca é tocado.
