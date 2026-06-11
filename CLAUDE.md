@@ -25,7 +25,7 @@ Testes vivem em `src/lib/__tests__/` (vitest). A camada `lib/` é bem coberta; o
 
 ## Arquitetura: 3 camadas
 
-1. **Entry/Routing** (`src/index.ts`) — Árvore de comandos Commander: `init`, `create agent|skill`, `list agents|skills`, `remove agent|skill`, `update`, `doctor`, `hooks install|uninstall|list`, `statusline install|uninstall|list`
+1. **Entry/Routing** (`src/index.ts`) — Árvore de comandos Commander: `init`, `create agent|skill`, `list agents|skills|commands`, `remove agent|skill|command`, `update`, `doctor`, `hooks install|uninstall|list`, `statusline install|uninstall|list`
 2. **Commands** (`src/commands/*`) — Lógica de negócio + prompts Inquirer. Cada arquivo exporta uma função async que é chamada pelo Commander
 3. **Utilities** (`src/lib/*`) — Serviços reutilizáveis: paths, symlinks, templates, frontmatter, format, plugins
 
@@ -41,8 +41,8 @@ Agentes/skills são instalados como symlinks de `~/.claude/agents/` e `~/.claude
 - **External repo** (configurado em `.claudiao.json` com `repoPath`) — para usuários avançados com repo Git próprio
 - **Bundled** (`templates/`) — agentes/skills que vêm com o npm package
 
-### Agents = arquivo .md, Skills = diretório com SKILL.md
-Agentes são um único `.md` com YAML frontmatter. Skills vivem em `~/.claude/skills/{name}/SKILL.md` (diretório permite expansão futura).
+### Agents = arquivo .md, Skills = diretório com SKILL.md, Commands = arquivo .md
+Agentes são um único `.md` com YAML frontmatter. Skills vivem em `~/.claude/skills/{name}/SKILL.md` (diretório permite expansão futura). Slash commands são `.md` standalone em `~/.claude/commands/` — não exigem `name:` no frontmatter (derivado do filename).
 
 ### Gestão de plugins foi removida (v1.5.0)
 O registry hardcoded (`lib/plugins.ts`) foi removido — plugins são responsabilidade do sistema nativo do Claude Code (`claude /plugin`). `claudiao install` existe só como stub de deprecação.

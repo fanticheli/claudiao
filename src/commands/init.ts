@@ -3,15 +3,16 @@ import { join } from 'node:path';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import {
-  CLAUDE_DIR, CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, CLAUDE_MD, CONFIG_FILE,
-  getAgentsSource, getSkillsSource, getGlobalMdSource, getExternalRepoPath,
+  CLAUDE_DIR, CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, CLAUDE_COMMANDS_DIR, CLAUDE_MD, CONFIG_FILE,
+  getAgentsSource, getSkillsSource, getCommandsSource, getGlobalMdSource, getExternalRepoPath,
 } from '../lib/paths.js';
 import { createSymlink, ensureDir } from '../lib/symlinks.js';
-import { parseAgentFile } from '../lib/frontmatter.js';
+import { parseAgentFile, parseCommandFile } from '../lib/frontmatter.js';
 import { getPackageVersion } from '../lib/package-info.js';
 import {
   validateAgentFrontmatter,
   validateSkillFrontmatter,
+  validateCommandFrontmatter,
   hasErrors,
   hasWarnings,
 } from '../lib/validate-frontmatter.js';
@@ -57,8 +58,8 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
   // Create ~/.claude/
   dryRunnable({ dryRun }, () => ensureDir(CLAUDE_DIR), 'Criaria diretorio ~/.claude/ (se nao existir)');
 
-  // [1/3] Install CLAUDE.md global
-  heading('[1/3] CLAUDE.md Global');
+  // [1/4] Install CLAUDE.md global
+  heading('[1/4] CLAUDE.md Global');
   dim('Regras universais de codigo, git workflow, lista de agentes/skills');
   raw('');
 
@@ -75,8 +76,8 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
     warn('global-CLAUDE.md nao encontrado');
   }
 
-  // [2/3] Install agents
-  heading('[2/3] Agentes');
+  // [2/4] Install agents
+  heading('[2/4] Agentes');
   dim('Especialistas que o Claude Code invoca automaticamente pelo contexto');
   raw('');
 
@@ -160,9 +161,9 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
     warn('Nenhum agente encontrado. Use `claudiao create agent` pra criar.');
   }
 
-  // [3/3] Install skills
-  heading('[3/3] Skills');
-  dim('Slash commands com templates prontos (ex: /pr-template, /security-checklist)');
+  // [3/4] Install skills
+  heading('[3/4] Skills');
+  dim('Skills com templates/checklists invocaveis como /skill-name (ex: /pr-template)');
   raw('');
 
   let skillCount = 0;
@@ -228,6 +229,82 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
     warn('Nenhuma skill encontrada. Use `claudiao create skill` pra criar.');
   }
 
+  // [4/4] Install slash commands
+  heading('[4/4] Slash Commands');
+  dim('Comandos /xxx standalone em ~/.claude/commands/ (ex: fluxos completos como /bug, /eod)');
+  raw('');
+
+  let commandCount = 0;
+  const commandsSource = getCommandsSource();
+  if (commandsSource && existsSync(commandsSource)) {
+    if (!dryRun) {
+      ensureDir(CLAUDE_COMMANDS_DIR);
+    }
+    const commandFiles = readdirSync(commandsSource).filter(f => f.endsWith('.md'));
+    commandCount = commandFiles.length;
+
+    if (dryRun) {
+      for (const file of commandFiles) {
+        const source = join(commandsSource, file);
+        try {
+          const meta = parseCommandFile(source);
+          info(`[dry-run] Linkaria command: /${meta.name} ${chalk.dim('— ' + meta.description.slice(0, 60))}`);
+        } catch (err) {
+          // expected: command file may have malformed frontmatter in dry-run
+          // preview; fall back to filename so the preview lists every file.
+          info(`[dry-run] Linkaria command: /${file.replace('.md', '')}`);
+          debug(`parseCommandFile(${file}) failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+      raw('');
+      info(`[dry-run] ${commandCount} commands seriam processados`);
+    } else {
+      let installed = 0;
+      let skipped = 0;
+      let invalid = 0;
+
+      for (const file of commandFiles) {
+        const source = join(commandsSource, file);
+        const target = join(CLAUDE_COMMANDS_DIR, file);
+
+        const validation = validateCommandFrontmatter(source);
+        if (hasErrors(validation)) {
+          const errs = validation.issues.filter((i) => i.severity === 'error');
+          error(`${file}: ${errs.map((i) => i.message).join('; ')}`);
+          invalid++;
+          invalidCount++;
+          continue;
+        }
+
+        const meta = parseCommandFile(source);
+        const result = createSymlink(source, target);
+
+        if (result.status === 'created' || result.status === 'backup') {
+          if (hasWarnings(validation)) {
+            const warns = validation.issues.filter((i) => i.severity === 'warn');
+            warn(`/${meta.name} instalado com avisos: ${warns.map((i) => i.message).join('; ')}`);
+          } else {
+            success(`/${meta.name} ${chalk.dim('— ' + meta.description.slice(0, 60))}`);
+          }
+          installed++;
+        } else {
+          raw(`  ${chalk.yellow('⏭')} /${meta.name} ${chalk.dim('— ja instalado')}`);
+          skipped++;
+        }
+      }
+
+      raw('');
+      const parts = [
+        `${chalk.green(String(installed) + ' novos')}`,
+        `${chalk.dim(String(skipped) + ' ja existiam')}`,
+      ];
+      if (invalid > 0) parts.push(chalk.red(`${invalid} ignorados (frontmatter invalido)`));
+      info(parts.join(' | '));
+    }
+  } else {
+    dim('Nenhum slash command no repositorio (opcional — adicione commands/ no repo externo).');
+  }
+
   // Ask about statusline (opt-in, substitui só se user confirmar)
   let statuslineInstalled = false;
   if (dryRun) {
@@ -290,7 +367,8 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
   raw(chalk.bold('  O que foi instalado:'));
   if (globalMdSource) raw(`  ${chalk.green('✓')} CLAUDE.md global com regras e configuracoes`);
   if (agentCount > 0) raw(`  ${chalk.green('✓')} ${agentCount} agentes especializados`);
-  if (skillCount > 0) raw(`  ${chalk.green('✓')} ${skillCount} skills / slash commands`);
+  if (skillCount > 0) raw(`  ${chalk.green('✓')} ${skillCount} skills`);
+  if (commandCount > 0) raw(`  ${chalk.green('✓')} ${commandCount} slash commands`);
   if (statuslineInstalled) raw(`  ${chalk.green('✓')} Statusline de contexto no rodape do Claude Code`);
   raw('');
 
@@ -302,6 +380,7 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
   raw(chalk.bold('  Comandos uteis:'));
   raw(`  ${chalk.yellow('claudiao list agents')}     Lista todos os agentes instalados`);
   raw(`  ${chalk.yellow('claudiao list skills')}     Lista todas as skills`);
+  raw(`  ${chalk.yellow('claudiao list commands')}   Lista todos os slash commands`);
   raw(`  ${chalk.yellow('claudiao create agent')}    Cria um novo agente`);
   raw(`  ${chalk.yellow('claudiao doctor')}          Verifica se tudo esta ok`);
   raw('');

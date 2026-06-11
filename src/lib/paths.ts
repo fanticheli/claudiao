@@ -22,6 +22,7 @@ export const PACKAGE_ROOT = findPackageRoot();
 export const CLAUDE_DIR = join(homedir(), '.claude');
 export const CLAUDE_AGENTS_DIR = join(CLAUDE_DIR, 'agents');
 export const CLAUDE_SKILLS_DIR = join(CLAUDE_DIR, 'skills');
+export const CLAUDE_COMMANDS_DIR = join(CLAUDE_DIR, 'commands');
 export const CLAUDE_MD = join(CLAUDE_DIR, 'CLAUDE.md');
 export const CONFIG_FILE = join(CLAUDE_DIR, '.claudiao.json');
 
@@ -94,6 +95,22 @@ export function getSkillsSource(): string | null {
 }
 
 /**
+ * Returns the best source for slash commands: external repo > bundled templates.
+ */
+export function getCommandsSource(): string | null {
+  const external = getExternalRepoPath();
+  if (external) {
+    const commandsDir = join(external, 'commands');
+    if (existsSync(commandsDir)) return commandsDir;
+  }
+
+  const bundled = join(getTemplatesPath(), 'commands');
+  if (existsSync(bundled)) return bundled;
+
+  return null;
+}
+
+/**
  * Returns the global CLAUDE.md source file.
  */
 export function getGlobalMdSource(): string | null {
@@ -123,4 +140,10 @@ export function getSkillsSavePath(): string {
   const external = getExternalRepoPath();
   if (external) return join(external, 'skills');
   return join(getTemplatesPath(), 'skills');
+}
+
+export function getCommandsSavePath(): string {
+  const external = getExternalRepoPath();
+  if (external) return join(external, 'commands');
+  return join(getTemplatesPath(), 'commands');
 }

@@ -167,12 +167,12 @@ claudiao doctor            # Diagnostica problemas de instalação
 ```
 
 **`claudiao update`** faz duas coisas:
-1. Se você usa [repo externo](#repo-externo-avançado), roda `git pull` pra puxar as versões mais recentes dos seus agentes/skills
-2. Recria os symlinks em `~/.claude/agents/` e `~/.claude/skills/`, garantindo que apontem pros templates atualizados (bundled ou do repo externo)
+1. Se você usa [repo externo](#repo-externo-avançado), roda `git pull` pra puxar as versões mais recentes dos seus agentes/skills/commands
+2. Recria os symlinks em `~/.claude/agents/`, `~/.claude/skills/` e `~/.claude/commands/`, garantindo que apontem pros templates atualizados (bundled ou do repo externo)
 
 Útil depois de atualizar o claudião via `npm update -g claudiao` (novos agentes/skills bundled) ou quando o time atualizou o repo compartilhado.
 
-**`claudiao doctor`** verifica: Claude Code instalado, diretório `~/.claude/` existe, CLAUDE.md global OK, integridade dos symlinks de agentes e skills, e config do repo externo. Se algo estiver quebrado, sugere o comando pra corrigir.
+**`claudiao doctor`** verifica: Claude Code instalado, diretório `~/.claude/` existe, CLAUDE.md global OK, integridade dos symlinks de agentes, skills e slash commands, e config do repo externo. Se algo estiver quebrado, sugere o comando pra corrigir.
 
 ### Criar
 
@@ -192,7 +192,8 @@ O wizard gera o arquivo `.md` com frontmatter YAML diretamente em `~/.claude/age
 
 ```bash
 claudiao list agents       # Lista agentes instalados por categoria, com [core|external|local]
-claudiao list skills       # Lista skills (slash commands), com coluna de origem
+claudiao list skills       # Lista skills, com coluna de origem
+claudiao list commands     # Lista slash commands (~/.claude/commands/), com coluna de origem
 ```
 
 A coluna de origem (`core` / `external` / `local`) aparece a partir da v1.2.0 e ajuda a debugar quando um agent/skill vem do pacote bundled, do seu [repo externo](#repo-externo-avançado) ou foi criado manualmente.
@@ -202,7 +203,12 @@ A coluna de origem (`core` / `external` / `local`) aparece a partir da v1.2.0 e 
 ```bash
 claudiao remove agent go-specialist
 claudiao remove skill deploy-checklist
+claudiao remove command bug
 ```
+
+### Slash commands (v1.6.0+)
+
+Slash commands são arquivos `.md` standalone em `~/.claude/commands/` — diferentes de skills (que vivem em diretório com `SKILL.md`). O claudião gerencia ambos da mesma forma: symlinks com cascata `repo externo > bundled`. Como o pacote não traz commands bundled, a fonte típica é o diretório `commands/` do seu [repo externo](#repo-externo-avançado). O `init`, `update`, `doctor` e `list`/`remove` cobrem commands automaticamente.
 
 ### Hooks (lembretes de skill)
 

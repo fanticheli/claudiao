@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import {
   validateAgentFrontmatter,
   validateSkillFrontmatter,
+  validateCommandFrontmatter,
   hasErrors,
   hasWarnings,
 } from '../validate-frontmatter.js';
@@ -223,5 +224,66 @@ describe('validateSkillFrontmatter', () => {
     expect(
       result.issues.some((i) => i.field === 'allowed-tools' && i.severity === 'warn'),
     ).toBe(true);
+  });
+});
+
+describe('validateCommandFrontmatter', () => {
+  it('returns no issues for a valid command (name derives from filename)', () => {
+    const dir = makeTmp();
+    const file = writeAgent(
+      dir,
+      'bug',
+      [
+        'description: Cria card de bug no Jira com preview e aprovação antes de qualquer escrita',
+        'allowed-tools: Read, Bash',
+      ].join('\n'),
+    );
+
+    const result = validateCommandFrontmatter(file);
+    expect(result.issues).toEqual([]);
+    expect(result.name).toBe('bug');
+  });
+
+  it('reports error when description is missing', () => {
+    const dir = makeTmp();
+    const file = writeAgent(dir, 'nodesc', 'argument-hint: <arg>');
+
+    const result = validateCommandFrontmatter(file);
+    expect(hasErrors(result)).toBe(true);
+    expect(result.issues.find((i) => i.field === 'description')?.severity).toBe('error');
+  });
+
+  it('accepts allowed-tools as YAML array', () => {
+    const dir = makeTmp();
+    const file = writeAgent(
+      dir,
+      'arraycmd',
+      [
+        'description: Command com allowed-tools em array YAML, descrição longa o bastante',
+        'allowed-tools:',
+        '  - Read',
+        '  - Bash',
+      ].join('\n'),
+    );
+
+    const result = validateCommandFrontmatter(file);
+    expect(result.issues.some((i) => i.field === 'allowed-tools' && i.severity === 'error')).toBe(false);
+  });
+
+  it('reports error when allowed-tools is neither string nor string array', () => {
+    const dir = makeTmp();
+    const file = writeAgent(
+      dir,
+      'badcmd',
+      [
+        'description: Command com allowed-tools inválido, descrição longa o bastante pra validar',
+        'allowed-tools:',
+        '  nested: true',
+      ].join('\n'),
+    );
+
+    const result = validateCommandFrontmatter(file);
+    expect(hasErrors(result)).toBe(true);
+    expect(result.issues.some((i) => i.field === 'allowed-tools' && i.severity === 'error')).toBe(true);
   });
 });
