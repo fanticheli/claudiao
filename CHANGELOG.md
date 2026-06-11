@@ -7,6 +7,16 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Perda de backup em `createSymlink`**: instalar por cima de um arquivo real quando já existia um `X.bak` (de uma instalação anterior, ou um arquivo legítimo do usuário) sobrescrevia o backup silenciosamente. Agora o backup novo cai no próximo slot livre (`X.bak.1`, `X.bak.2`, …) e o `.bak` existente nunca é tocado.
+- **`settings.json` malformado era apagado em fluxos de escrita**: `readSettings()` retornava `{}` quando o JSON não parseava, e o write seguinte (hooks install/uninstall, statusline install/uninstall) persistia esse `{}` por cima do arquivo — destruindo hooks de outros plugins, `permissions`, `env`, etc. Fluxos de escrita agora usam `readSettingsForWrite()`, que aborta com `MalformedSettingsError` e mensagem clara; fluxos read-only (`list`, `doctor`) continuam lenientes.
+- **Escrita não-atômica de `settings.json`**: `writeSettings()` agora escreve num arquivo temporário e faz `rename` atômico, eliminando o risco de `settings.json` truncado se o processo for interrompido no meio do write.
+
+### Added
+
+- 13 testes novos cobrindo os três cenários acima (`settings-write-safety.test.ts` + casos de colisão de `.bak` em `symlinks.test.ts`).
+
 ## [1.5.0] — 2026-04-19
 
 Release com dois temas integrados: simplificação de escopo (remoção da gestão de plugins de terceiros) e nova feature de statusline.

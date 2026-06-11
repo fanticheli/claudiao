@@ -17,14 +17,15 @@ CLI chamada "claudião" para gerenciar agentes, skills e plugins do Claude Code.
 npm run build          # Compila TypeScript (tsc)
 npm run dev            # Roda direto com tsx (sem compilar)
 npm run typecheck      # Verifica tipos sem compilar
+npm test               # Roda a suíte vitest
 npm run dev -- init    # Testar um comando específico
 ```
 
-Não há testes automatizados no projeto atualmente.
+Testes vivem em `src/lib/__tests__/` (vitest). A camada `lib/` é bem coberta; os comandos (`src/commands/*`) ainda não têm testes (FEAT-003 no BACKLOG.md).
 
 ## Arquitetura: 3 camadas
 
-1. **Entry/Routing** (`src/index.ts`) — Árvore de comandos Commander com subcomandos (`create agent|skill`, `list agents|skills|plugins`, `remove agent|skill`)
+1. **Entry/Routing** (`src/index.ts`) — Árvore de comandos Commander: `init`, `create agent|skill`, `list agents|skills`, `remove agent|skill`, `update`, `doctor`, `hooks install|uninstall|list`, `statusline install|uninstall|list`
 2. **Commands** (`src/commands/*`) — Lógica de negócio + prompts Inquirer. Cada arquivo exporta uma função async que é chamada pelo Commander
 3. **Utilities** (`src/lib/*`) — Serviços reutilizáveis: paths, symlinks, templates, frontmatter, format, plugins
 
@@ -43,8 +44,11 @@ Agentes/skills são instalados como symlinks de `~/.claude/agents/` e `~/.claude
 ### Agents = arquivo .md, Skills = diretório com SKILL.md
 Agentes são um único `.md` com YAML frontmatter. Skills vivem em `~/.claude/skills/{name}/SKILL.md` (diretório permite expansão futura).
 
-### Registry de plugins hardcoded
-`lib/plugins.ts` tem um array estático de 3 plugins (superpowers, get-shit-done, claude-mem). Novos plugins requerem atualizar o código.
+### Gestão de plugins foi removida (v1.5.0)
+O registry hardcoded (`lib/plugins.ts`) foi removido — plugins são responsabilidade do sistema nativo do Claude Code (`claude /plugin`). `claudiao install` existe só como stub de deprecação.
+
+### settings.json: leitura leniente vs. estrita
+`lib/hooks.ts` expõe duas leituras de `~/.claude/settings.json`: `readSettings()` (leniente — JSON inválido vira `{}`, usada por fluxos read-only como `list`/`doctor`) e `readSettingsForWrite()` (estrita — JSON inválido lança `MalformedSettingsError`, obrigatória em qualquer fluxo read→modify→write para nunca sobrescrever config do usuário). `writeSettings()` é atômica (tmp + rename).
 
 ## Convenções
 
