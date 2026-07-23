@@ -157,6 +157,113 @@ describe('claudiao-commit-reminder.mjs', () => {
   });
 });
 
+describe('claudiao-no-comments.mjs', () => {
+  const SCRIPT = 'claudiao-no-comments.mjs';
+
+  function parseDeny(stdout: string): { decision?: string; reason?: string } | null {
+    if (stdout.trim().length === 0) return null;
+    const parsed = JSON.parse(stdout) as {
+      hookSpecificOutput?: { permissionDecision?: string; permissionDecisionReason?: string };
+    };
+    const out = parsed.hookSpecificOutput;
+    if (!out?.permissionDecision) return null;
+    return { decision: out.permissionDecision, reason: out.permissionDecisionReason };
+  }
+
+  it('blocks a full-line // comment in a .ts Write', () => {
+    const { stdout, status } = runHook(SCRIPT, {
+      tool_name: 'Write',
+      tool_input: { file_path: '/tmp/nope-x.ts', content: '// calcula o total\nconst total = a + b;\n' },
+    });
+    expect(status).toBe(0);
+    const out = parseDeny(stdout);
+    expect(out?.decision).toBe('deny');
+    expect(out?.reason).toContain('comentário');
+  });
+
+  it('blocks an inline // comment', () => {
+    const { stdout } = runHook(SCRIPT, {
+      tool_name: 'Write',
+      tool_input: { file_path: '/tmp/nope-y.ts', content: 'const total = a + b; // soma\n' },
+    });
+    expect(parseDeny(stdout)?.decision).toBe('deny');
+  });
+
+  it('blocks a # comment in a .py Write', () => {
+    const { stdout } = runHook(SCRIPT, {
+      tool_name: 'Write',
+      tool_input: { file_path: '/tmp/nope-z.py', content: '# soma os valores\ntotal = a + b\n' },
+    });
+    expect(parseDeny(stdout)?.decision).toBe('deny');
+  });
+
+  it('allows clean code with no comments', () => {
+    const { stdout, status } = runHook(SCRIPT, {
+      tool_name: 'Write',
+      tool_input: { file_path: '/tmp/ok-a.ts', content: 'const total = a + b;\nexport { total };\n' },
+    });
+    expect(status).toBe(0);
+    expect(parseDeny(stdout)).toBeNull();
+  });
+
+  it('does not false-positive on a URL inside a string', () => {
+    const { stdout } = runHook(SCRIPT, {
+      tool_name: 'Write',
+      tool_input: { file_path: '/tmp/ok-b.ts', content: 'const url = "https://example.com/path";\n' },
+    });
+    expect(parseDeny(stdout)).toBeNull();
+  });
+
+  it('ignores a shebang line', () => {
+    const { stdout } = runHook(SCRIPT, {
+      tool_name: 'Write',
+      tool_input: { file_path: '/tmp/ok-c.sh', content: '#!/usr/bin/env bash\necho hi\n' },
+    });
+    expect(parseDeny(stdout)).toBeNull();
+  });
+
+  it('is silent for non-code files', () => {
+    const { stdout } = runHook(SCRIPT, {
+      tool_name: 'Write',
+      tool_input: { file_path: 'README.md', content: '<!-- nota -->\n# Título\n' },
+    });
+    expect(parseDeny(stdout)).toBeNull();
+  });
+
+  it('does not block comments that already existed in an Edit old_string', () => {
+    const { stdout } = runHook(SCRIPT, {
+      tool_name: 'Edit',
+      tool_input: {
+        file_path: '/tmp/edit-a.ts',
+        old_string: '// legado\nconst a = 1;',
+        new_string: '// legado\nconst a = 2;',
+      },
+    });
+    expect(parseDeny(stdout)).toBeNull();
+  });
+
+  it('blocks a comment newly added in an Edit', () => {
+    const { stdout } = runHook(SCRIPT, {
+      tool_name: 'Edit',
+      tool_input: {
+        file_path: '/tmp/edit-b.ts',
+        old_string: 'const a = 1;',
+        new_string: 'const a = 1; // muda depois',
+      },
+    });
+    expect(parseDeny(stdout)?.decision).toBe('deny');
+  });
+
+  it('is silent for malformed JSON input', () => {
+    const result = spawnSync('node', [join(HOOKS_DIR, SCRIPT)], {
+      input: 'not json',
+      encoding: 'utf-8',
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe('');
+  });
+});
+
 describe('claudiao-pr-reminder.mjs', () => {
   const SCRIPT = 'claudiao-pr-reminder.mjs';
 
