@@ -2,7 +2,7 @@
 
 CLI que instala e gerencia agentes, skills, hooks e CLAUDE.md global para o [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
-> Seu Claude Code no próximo nível. **18 agentes + 9 skills + 5 hooks + statusline de contexto + CLAUDE.md global + wizard de criação + doctor** — tudo em um comando.
+> Seu Claude Code no próximo nível. **18 agentes + 9 skills + 6 hooks + statusline de contexto + CLAUDE.md global + wizard de criação + doctor** — tudo em um comando.
 
 ## Pra quem é isso?
 
@@ -212,15 +212,16 @@ Slash commands são arquivos `.md` standalone em `~/.claude/commands/` — difer
 
 ### Hooks (lembretes de skill)
 
-Hooks são lembretes não-bloqueantes injetados pelo Claude Code em momentos-chave. Existem dois tipos complementares:
+Hooks são injetados pelo Claude Code em momentos-chave. A maioria são lembretes não-bloqueantes; um deles (`no-comments`) bloqueia de fato. Existem três tipos:
 
-- **Hooks `PreToolUse`** lembram **durante a edição**: editar endpoint lembra de `/security-checklist`, editar migration lembra de `/sql-templates`, etc.
+- **Hooks `PreToolUse` (lembrete)** lembram **durante a edição**: editar endpoint lembra de `/security-checklist`, editar migration lembra de `/sql-templates`, etc.
+- **Hook `PreToolUse` (bloqueante)** — `no-comments` **nega** o `Write`/`Edit` quando a mudança adiciona comentários em código-fonte, forçando a reescrever sem eles. Respeita comentários preexistentes e ignora arquivos não-código (`.md`, `.json`, `.yaml`).
 - **Hook `Stop`** (v1.3.0+) lembra **no fim da sessão**, fechando o loop: chama `/pr-template` e `/security-checklist` antes de abrir o PR, evitando esquecer de rodar as skills de fechamento.
 
 A partir da v1.2.0 os scripts são Node.js (`.mjs`) e funcionam em Linux, macOS e Windows nativo sem dependências externas.
 
 ```bash
-claudiao hooks install                         # seleção interativa dos 5 hooks bundled
+claudiao hooks install                         # seleção interativa dos 6 hooks bundled
 claudiao hooks install --only security,pr      # instala apenas os categorias informadas
 claudiao hooks list                            # mostra hooks ativos
 claudiao hooks uninstall                       # remove apenas os hooks do claudião, preserva outros
@@ -248,10 +249,23 @@ claudiao statusline uninstall         # remove só se foi o claudião que instal
 
 O script vive em `~/.claude/statusline/context-bar.mjs` (cópia do template bundled, igual aos hooks). Pode ser editado pra customizar o formato. `claudiao statusline uninstall` preserva statusLines de outras origens — só remove se detectar que o path pertence ao claudião.
 
+### Atribuição do Claude Code (v1.7.0+)
+
+Remove o trailer `🤖 Generated with Claude Code` + link de sessão nos corpos de PR e o `Co-Authored-By: Claude` nos commits. `claudiao init` já desativa isso automaticamente; os comandos abaixo permitem controlar depois:
+
+```bash
+claudiao attribution off      # desativa (attribution.commit="", attribution.pr="", includeCoAuthoredBy=false)
+claudiao attribution on       # reativa o padrão do Claude Code (remove as chaves)
+claudiao attribution status   # mostra o estado atual
+```
+
+Escreve em `~/.claude/settings.json` via merge atômico (preserva o resto da config). Cobre **git e GitHub**; para Jira, Slack e docs — que a config do Claude Code não alcança — a regra correspondente vive no `CLAUDE.md` global instalado pelo `init`.
+
 | Hook | Evento | Matcher | Quando lembra |
 |------|--------|---------|---------------|
 | `security` | `PreToolUse` | `Write\|Edit` em paths com `controller`, `route`, `handler`, `/api/`, `/auth/` | `/security-checklist` antes de declarar endpoint pronto |
 | `ui` | `PreToolUse` | `Write\|Edit` em `.tsx/.jsx/.vue/.svelte` ou `components/pages/views` | `/ui-review-checklist` antes de abrir PR |
+| `no-comments` | `PreToolUse` (bloqueia) | `Write\|Edit` em código (`.ts/.js/.py/.go/.rs/...`) | **Nega** a edição se adicionar comentários no código |
 | `migration` | `PreToolUse` | `Write\|Edit` em `migrations/`, `*.sql`, `alembic/versions`, `prisma/migrations` | Patterns zero-downtime de `/sql-templates` |
 | `commit` | `PreToolUse` | `Bash` com `git commit -m "..."` | Valida formato conventional commits |
 | `pr` | `Stop` | (sem matcher) | `/pr-template` + `/security-checklist` no fim de sessão com edits — fecha o loop do fluxo |
@@ -304,7 +318,7 @@ O claudião gerencia agents, skills, hooks e CLAUDE.md global dentro de `~/.clau
 - **Plugins do Claude Code** (instalados via `claude /plugin install <nome>`) — ex: `superpowers`, `get-shit-done` (GSD), `claude-mem`. Esses plugins podem adicionar agents, hooks e skills em `~/.claude/` independente do claudião, com ciclo de vida próprio.
 - **Customizações manuais** do usuário — arquivos `.md` criados direto em `~/.claude/agents/` ou similar.
 - **Repo externo** configurado via `.claudiao.json` com `repoPath`.
-- **Core do claudião** — os 18 agents, 9 skills, 5 hooks e CLAUDE.md global bundled no pacote.
+- **Core do claudião** — os 18 agents, 9 skills, 6 hooks e CLAUDE.md global bundled no pacote.
 
 **O que o claudião gerencia:** apenas os itens instalados pelo próprio claudião. São identificáveis por serem symlinks pros templates do pacote ou do repo externo configurado. A coluna `source` em `claudiao list agents/skills` (`[core|external|local]`) ajuda a distinguir.
 

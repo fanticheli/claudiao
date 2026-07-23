@@ -7,6 +7,17 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.7.0] — 2026-07-23
+
+Dois reforços de fluxo: um hook que bloqueia comentários em código e a desativação da atribuição do Claude Code em commits e PRs.
+
+### Added
+
+- **Hook `no-comments`** (bundled): novo `PreToolUse` em `Write|Edit` que **bloqueia** (`permissionDecision: deny`) qualquer edição que adicione comentários em código-fonte (`//`, `/* */`, `#`). Só olha linhas novas (respeita comentários preexistentes), ignora arquivos não-código, shebang e URLs. Instale com `claudiao hooks install --only no-comments`.
+- **Comando `claudiao attribution`** (`off`/`on`/`status`): desativa o trailer `🤖 Generated with Claude Code` nos corpos de PR e o `Co-Authored-By: Claude` nos commits, escrevendo `attribution` + `includeCoAuthoredBy` em `~/.claude/settings.json` via merge atômico. `claudiao init` passa a desativar isso automaticamente e `claudiao doctor` reporta o estado.
+- Regra de atribuição no `CLAUDE.md` global — cobre Jira, Slack e docs, que a config do Claude Code não alcança.
+- Testes: integração do hook `no-comments` (11 casos) e unit da lib `attribution` (10 casos).
+
 ## [1.6.0] — 2026-06-11
 
 Slash commands como terceiro tipo de artefato gerenciado + primeiro bundle de commands (fanti-flow).
