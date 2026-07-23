@@ -17,6 +17,7 @@ import {
   hasWarnings,
 } from '../lib/validate-frontmatter.js';
 import { banner, success, warn, error, info, dim, heading, separator, raw, debug } from '../lib/format.js';
+import { disableAttribution } from '../lib/attribution.js';
 import { dryRunnable } from '../lib/dry-run.js';
 import { execSync } from 'node:child_process';
 
@@ -335,6 +336,29 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
     }
   }
 
+  // Disable Claude Code attribution (no "Generated with" / "Co-Authored-By")
+  let attributionDisabled = false;
+  if (dryRun) {
+    raw('');
+    info('[dry-run] Desativaria a atribuicao do Claude Code em commits e PRs');
+  } else {
+    try {
+      const result = disableAttribution();
+      attributionDisabled = true;
+      raw('');
+      if (result.changed) {
+        success('Atribuicao do Claude Code desativada (sem "Generated with" / "Co-Authored-By")');
+      } else {
+        info('Atribuicao do Claude Code ja estava desativada');
+      }
+    } catch (err) {
+      // expected: settings.json can be locked or malformed; keep going so the
+      // rest of init still finishes. User can retry via `claudiao attribution off`.
+      error(`Falha ao desativar atribuicao: ${err instanceof Error ? err.message : String(err)}`);
+      debug(`disableAttribution failed: ${err instanceof Error ? err.stack : String(err)}`);
+    }
+  }
+
   // Save config — preserve existing repoPath if current source is unavailable
   if (dryRun) {
     info('[dry-run] Salvaria configuracao em .claudiao.json');
@@ -370,6 +394,7 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
   if (skillCount > 0) raw(`  ${chalk.green('✓')} ${skillCount} skills`);
   if (commandCount > 0) raw(`  ${chalk.green('✓')} ${commandCount} slash commands`);
   if (statuslineInstalled) raw(`  ${chalk.green('✓')} Statusline de contexto no rodape do Claude Code`);
+  if (attributionDisabled) raw(`  ${chalk.green('✓')} Atribuicao do Claude Code desativada em commits e PRs`);
   raw('');
 
   raw(chalk.bold('  Proximos passos:'));

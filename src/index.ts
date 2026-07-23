@@ -10,6 +10,7 @@ import { update } from './commands/update.js';
 import { installPlugin } from './commands/install-plugin.js';
 import { installHooks, uninstallHooks, listHooks } from './commands/hooks.js';
 import { installStatusline, uninstallStatusline, listStatusline } from './commands/statusline.js';
+import { attributionOff, attributionOn, attributionStatus } from './commands/attribution.js';
 import { getPackageVersion } from './lib/package-info.js';
 import { MalformedSettingsError } from './lib/hooks.js';
 import { setVerbose, debug } from './lib/format.js';
@@ -241,6 +242,34 @@ statusline
   .description('Mostra a statusLine ativa e se foi instalada pelo claudiao')
   .action(() => {
     listStatusline();
+  });
+
+// ============================================================
+// attribution
+// ============================================================
+const attribution = program
+  .command('attribution')
+  .description('Liga/desliga a atribuição do Claude Code (Generated with / Co-Authored-By) em commits e PRs');
+
+attribution
+  .command('off')
+  .description('Desativa a atribuição em commits e PRs (settings.json)')
+  .action(async () => {
+    await attributionOff();
+  });
+
+attribution
+  .command('on')
+  .description('Reativa a atribuição padrão do Claude Code')
+  .action(async () => {
+    await attributionOn();
+  });
+
+attribution
+  .command('status')
+  .description('Mostra se a atribuição está ativa ou desativada')
+  .action(() => {
+    attributionStatus();
   });
 
 // ============================================================

@@ -41,6 +41,12 @@ Responda sempre em **português brasileiro (pt-BR)**.
 - Título: conventional commit style em inglês
 - Body: em português com seções: O que foi feito, Por quê, Como testar
 
+### Atribuição (NUNCA adicione)
+- **NUNCA** inclua trailer de atribuição, co-autoria ou propaganda em NENHUM texto que você produz: `🤖 Generated with Claude Code`, `Co-Authored-By: Claude`, `Co-authored-by: ...`, nem link de sessão (`https://claude.ai/code/...`)
+- Vale para **tudo**: mensagens de commit, corpo de PR, cards e comentários de Jira, mensagens de Slack, docs, e-mails e qualquer artefato externo
+- O texto deve parecer escrito pelo próprio usuário — sem assinatura de ferramenta
+- Exceção única: se o usuário pedir explicitamente a atribuição
+
 ## 4. Auto Skill Creation
 
 Quando identificar uma tarefa complexa e recorrente que exija conhecimento especializado não coberto pelas skills existentes, crie uma nova skill em `~/.claude/skills/` ANTES de executar a tarefa. Inclua:
