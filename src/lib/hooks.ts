@@ -82,6 +82,14 @@ export const HOOK_CATEGORIES: HookCategory[] = [
     event: 'PreToolUse',
   },
   {
+    id: 'no-comments',
+    name: 'No-comments enforcer',
+    description: 'Bloqueia Write/Edit que adiciona comentários em código-fonte',
+    script: 'claudiao-no-comments.mjs',
+    matcher: 'Write|Edit',
+    event: 'PreToolUse',
+  },
+  {
     id: 'commit',
     name: 'Conventional commit reminder',
     description: 'Valida formato conventional commits ao rodar git commit',
@@ -112,7 +120,7 @@ interface HookMatcher {
   hooks: HookEntry[];
 }
 
-interface SettingsJson {
+export interface SettingsJson {
   hooks?: Partial<Record<'PreToolUse' | 'PostToolUse' | 'SessionStart' | 'Stop', HookMatcher[]>>;
   [key: string]: unknown;
 }
