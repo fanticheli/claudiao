@@ -17,6 +17,8 @@ import {
   isClaudiaoStatusline,
   getInstalledStatusline,
 } from '../lib/statusline.js';
+import { readSettings } from '../lib/hooks.js';
+import { getAttributionState } from '../lib/attribution.js';
 
 export function doctor(): void {
   banner();
@@ -317,6 +319,17 @@ export function doctor(): void {
     }
   } else {
     dim(`Statusline ativa (nao gerenciada pelo claudiao): ${statuslineEntry.command}`);
+  }
+
+  // 13. Attribution
+  const attributionState = getAttributionState(readSettings());
+  if (attributionState === 'disabled') {
+    success('Atribuicao do Claude Code desativada (sem "Generated with" / "Co-Authored-By")');
+  } else if (attributionState === 'partial') {
+    warn('Atribuicao do Claude Code so parcialmente desativada');
+    dim('Rode: claudiao attribution off');
+  } else {
+    dim('Atribuicao do Claude Code ativa (padrao). Desative com: claudiao attribution off');
   }
 
   // Summary (bold colored header preserved via raw — dim/success/warn all
