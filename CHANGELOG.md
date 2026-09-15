@@ -9,15 +9,20 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ### Adicionado
 
-- **5 hooks de enforcement** (`english-code`, `commit-message`, `credentials`, `no-attribution`, `review-gate`), com 407 testes em `templates/hooks/tests` rodando via `node --test` no `npm test` e no CI.
+- **Skill `session-insights`**: minera o histórico de sessões (extração local, sem tokens), agrupa os erros recorrentes do Claude e propõe contramedidas, com aprovação obrigatória antes de implementar. Inclui `extract-episodes.py`, que mascara credenciais antes de truncar, e 14 testes.
+- **5 hooks de enforcement** (`english-code`, `commit-message`, `credentials`, `no-attribution`, `review-gate`), com 415 testes em `templates/hooks/tests` rodando via `node --test` no `npm test` e no CI.
+- **Agente `independent-reviewer`** bundled, usado pelo hook `review-gate`.
 - `HookCategory.extraEvents`: uma categoria pode registrar o mesmo script em vários eventos (o review gate usa `PreToolUse`, `Stop`, `SubagentStop` e `UserPromptSubmit`). O `matcher` vale só nos eventos que o suportam.
 - `HookCategory.extraFiles`: arquivos importados pelo hook (ex.: `lib/portuguese.mjs`) são copiados junto com o script.
 - Eventos `SubagentStop`, `UserPromptSubmit` e `SessionEnd` no tipo `HookEvent`.
 
 ### Corrigido
 
+- `claudiao-no-comments` acusava comentário em texto dentro de string multilinha (docstring Python com título markdown, template literal com barras).
+- `claudiao-no-attribution` bloqueava documentação que citava um commit e os termos de atribuição na mesma linha. Agora o comando que publica precisa estar em posição de comando, e o regex do `git` deixou de ter backtracking exponencial.
 - `npm test` rodava também os testes compilados em `dist/`, desatualizados e falhando. Agora roda `vitest run src` mais os testes dos hooks.
 - O CI não executava a suíte de testes: rodava só typecheck, build e `--help`.
+- Teste instável em `install-plugin.deprecation.test.ts`: `vi.doMock` dependia da ordem de carga dos módulos e falhava em cerca de 1 de cada 5 execuções.
 
 ## [1.7.0] — 2026-07-23
 
