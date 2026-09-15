@@ -27,6 +27,42 @@ function stripStrings(line) {
   return line.replace(/'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`/g, '""');
 }
 
+function multilineStringContent(text, style) {
+  const source = String(text ?? '');
+  const openers = style === 'hash' ? ['"""', "'''"] : ['`'];
+  const inside = new Set();
+  let delimiter = null;
+  let current = '';
+  for (let index = 0; index < source.length; index += 1) {
+    if (source[index] === '\\') {
+      current += source.slice(index, index + 2);
+      index += 1;
+      continue;
+    }
+    if (delimiter) {
+      if (source.startsWith(delimiter, index)) {
+        for (const line of current.split('\n')) inside.add(line.trim());
+        index += delimiter.length - 1;
+        delimiter = null;
+        current = '';
+        continue;
+      }
+      current += source[index];
+      continue;
+    }
+    const opener = openers.find((candidate) => source.startsWith(candidate, index));
+    if (opener) {
+      delimiter = opener;
+      index += opener.length - 1;
+    }
+  }
+  if (delimiter) {
+    for (const line of current.split('\n')) inside.add(line.trim());
+  }
+  inside.delete('');
+  return inside;
+}
+
 function styleFor(filePath) {
   const ext = (filePath.match(/\.([a-z0-9]+)$/i)?.[1] ?? '').toLowerCase();
   if (C_STYLE.has(ext)) return 'c';
@@ -68,6 +104,13 @@ function addedLines(oldText, newText) {
     .filter((line) => !existing.has(line.trim()));
 }
 
+function resultingTexts(toolName, input) {
+  if (toolName === 'Write') return [String(input.content ?? '')];
+  if (toolName === 'Edit') return [String(input.new_string ?? '')];
+  if (Array.isArray(input.edits)) return input.edits.map((edit) => String(edit?.new_string ?? ''));
+  return [String(input.content ?? input.new_string ?? '')];
+}
+
 function candidateLines(toolName, input) {
   if (toolName === 'Write') {
     let baseline = '';
@@ -93,7 +136,12 @@ if (typeof filePath !== 'string' || !filePath) process.exit(0);
 const style = styleFor(filePath);
 if (!style) process.exit(0);
 
-const offenders = candidateLines(payload.tool_name ?? '', input).filter((line) => isComment(line, style));
+const insideStrings = new Set(
+  resultingTexts(payload.tool_name ?? '', input).flatMap((text) => [...multilineStringContent(text, style)]),
+);
+const offenders = candidateLines(payload.tool_name ?? '', input)
+  .filter((line) => isComment(line, style))
+  .filter((line) => !insideStrings.has(line.trim()));
 if (offenders.length === 0) process.exit(0);
 
 const sample = offenders
