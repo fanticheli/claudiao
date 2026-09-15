@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { unquotedSegments } from './claudiao-credentials.mjs';
 
 const ATTRIBUTION = /generated with \[?claude|🤖\s*generated|claude\.ai\/code|claude-session:|co-authored-by:[^\n"\\]*(claude|anthropic)/i;
-const WRITING_COMMAND = /\bgh\s+(pr\s+(create|edit|comment|review|merge)|issue\s+(create|comment|edit)|release\s+(create|edit)|gist\s+(create|edit)|api\b[^\n]*(-X\s*(POST|PATCH|PUT)|\s-[fF]\s|--field|--raw-field|--input))|\bgit\s+(?:-\S+\s+(?:\S+\s+)?)*(commit|notes\s+(add|append|edit)|merge(?=\s|$)|tag\s+[^\n]*-[amsF])|\bglab\s+(mr|issue)\s+(create|note|update)|\bcurl\b[^\n]*(api\.github\.com|atlassian\.net|slack\.com)/i;
+const WRITING_COMMAND_BODY = String.raw`gh\s+(pr\s+(create|edit|comment|review|merge)|issue\s+(create|comment|edit)|release\s+(create|edit)|gist\s+(create|edit)|api\b[^\n]*(-X\s*(POST|PATCH|PUT)|\s-[fF]\s|--field|--raw-field|--input))|git(?:\s+-\S+(?:\s+[^-\s]\S*)?){0,6}\s+(commit|notes\s+(add|append|edit)|merge(?=\s|$)|tag\s+[^\n]*-[amsF])|glab\s+(mr|issue)\s+(create|note|update)|curl\b[^\n]*(api\.github\.com|atlassian\.net|slack\.com)`;
+const WRITING_COMMAND = new RegExp(`^\\s*(?:[A-Za-z_]\\w*=\\S*\\s+)*(?:sudo\\s+|time\\s+|env\\s+)?(?:${WRITING_COMMAND_BODY})`, 'i');
 const SEARCH_SEGMENT = /^\s*(grep|egrep|rg|sed|awk|jq)\b/;
 const FILE_ARGUMENTS = [
   /(?:--body-file|--file|--input|(?<!\S)-F)(?:\s+|=)("[^"]+"|'[^']+'|[^\s;&|<>]+)/g,
@@ -61,8 +62,9 @@ export function attributionViolation(payload) {
   const input = payload?.tool_input ?? {};
   if (tool === 'Bash') {
     const command = String(input.command ?? '');
-    const relevant = unquotedSegments(command).filter((segment) => !SEARCH_SEGMENT.test(segment)).join('\n');
-    if (!WRITING_COMMAND.test(relevant)) return null;
+    const segments = unquotedSegments(command).filter((segment) => !SEARCH_SEGMENT.test(segment));
+    if (!segments.some((segment) => WRITING_COMMAND.test(segment))) return null;
+    const relevant = segments.join('\n');
     if (ATTRIBUTION.test(relevant)) return 'comando que publica texto com atribuição de IA';
     if (ATTRIBUTION.test(referencedFileContents(command, payload.cwd))) return 'arquivo usado como corpo/mensagem com atribuição de IA';
     return null;
