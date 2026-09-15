@@ -7,6 +7,18 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Adicionado
+
+- **5 hooks de enforcement** (`english-code`, `commit-message`, `credentials`, `no-attribution`, `review-gate`), com 407 testes em `templates/hooks/tests` rodando via `node --test` no `npm test` e no CI.
+- `HookCategory.extraEvents`: uma categoria pode registrar o mesmo script em vários eventos (o review gate usa `PreToolUse`, `Stop`, `SubagentStop` e `UserPromptSubmit`). O `matcher` vale só nos eventos que o suportam.
+- `HookCategory.extraFiles`: arquivos importados pelo hook (ex.: `lib/portuguese.mjs`) são copiados junto com o script.
+- Eventos `SubagentStop`, `UserPromptSubmit` e `SessionEnd` no tipo `HookEvent`.
+
+### Corrigido
+
+- `npm test` rodava também os testes compilados em `dist/`, desatualizados e falhando. Agora roda `vitest run src` mais os testes dos hooks.
+- O CI não executava a suíte de testes: rodava só typecheck, build e `--help`.
+
 ## [1.7.0] — 2026-07-23
 
 Dois reforços de fluxo: um hook que bloqueia comentários em código e a desativação da atribuição do Claude Code em commits e PRs.

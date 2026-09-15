@@ -11,7 +11,8 @@
     "dev": "tsx src/index.ts",
     "prepublishOnly": "npm run build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run src && npm run test:hooks",
+    "test:hooks": "node --test templates/hooks/tests/"
   },
   "keywords": [
     "claude",
