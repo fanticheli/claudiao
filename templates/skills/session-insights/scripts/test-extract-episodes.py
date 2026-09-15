@@ -119,6 +119,26 @@ class ExtractEpisodesTest(unittest.TestCase):
         self.assertIn('username           v-oidc-app', extract.redact(table))
         self.assertNotIn(lease, extract.redact(f'{{"username": "v-oidc", "password": "{lease}"}}'))
 
+    def test_flag_header_and_cli_password_forms_are_redacted(self):
+        secret = 'Zk8Pq2LmN0aBcD'
+        samples = [
+            f'DB_PASSWORD_PROD={secret} node migrate.js',
+            f"PGPASSWORD='my {secret} pass' psql",
+            f'psql --password {secret} -h prod',
+            f'psql --password={secret} -h prod',
+            f'mysql -h prod -u app -p{secret}',
+            f'curl -u admin:{secret} https://x',
+            f'redis-cli -h prod -a {secret}',
+            f'aws configure set aws_secret_access_key {secret}',
+            f"curl -H 'Authorization: Bearer {secret}' https://x",
+            f'psql postgresql://app:Dev@{secret}@prod/db',
+            f'{{"db_password": "{secret}"}}',
+        ]
+        for sample in samples:
+            self.assertNotIn(secret, extract.redact(sample), sample)
+        self.assertEqual(extract.redact('psql --no-password -h localhost'), 'psql --no-password -h localhost')
+        self.assertEqual(extract.redact('mkdir -p src/queue'), 'mkdir -p src/queue')
+
     def test_malformed_rows_do_not_crash(self):
         path = os.path.join(self.project, 'broken.jsonl')
         with open(path, 'w') as handle:

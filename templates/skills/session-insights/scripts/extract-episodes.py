@@ -25,9 +25,15 @@ SIGNALS = [
     (r'mais curto|mais objetivo|n[ãa]o entendi|\btoo long\b|\bshorter\b|\bdon.t understand\b', 'unclear-answer'),
 ]
 SECRET_RULES = [
-    (re.compile(r"((?:PG)?PASSWORD=|PASSWD=|SECRET=|TOKEN=|API_KEY=)['\"]?[^\s'\"]+", re.IGNORECASE), r"\1[REDACTED]"),
-    (re.compile(r"(://[^:/\s@'\"]+:)[^@\s'\"]+@"), r"\1[REDACTED]@"),
-    (re.compile(r"(\"(?:password|secret|api_key|token|client_secret)\"\s*:\s*\")[^\"]+(\")", re.IGNORECASE), r"\1[REDACTED]\2"),
+    (re.compile(r"(\b\w*(?:PASSWORD|PASSWD|SECRET|TOKEN|API_KEY)\w*=)(?:'[^']*'|\"[^\"]*\"|[^\s'\"]+)", re.IGNORECASE), r"\1[REDACTED]"),
+    (re.compile(r"(--[\w-]*(?:password|passwd|secret|token|api-key)(?:=|\s+))(?!-)(?:'[^']*'|\"[^\"]*\"|\S+)", re.IGNORECASE), r"\1[REDACTED]"),
+    (re.compile(r"(\b(?:mysql|mysqldump|mysqladmin|mariadb)\b[^\n]*?\s-p)(?:'[^']*'|\"[^\"]*\"|\S+)"), r"\1[REDACTED]"),
+    (re.compile(r"(\bredis-cli\b[^\n]*?\s(?:-a|--pass)\s+)\S+"), r"\1[REDACTED]"),
+    (re.compile(r"(\s(?:-u|--user)(?:\s+|=)['\"]?[^\s:'\"]+:)[^\s'\"]+"), r"\1[REDACTED]"),
+    (re.compile(r"(\baws\s+configure\s+set\s+(?:aws_secret_access_key|aws_session_token)\s+)\S+", re.IGNORECASE), r"\1[REDACTED]"),
+    (re.compile(r"(authorization:\s*(?:bearer|token|basic)\s+)\S+", re.IGNORECASE), r"\1[REDACTED]"),
+    (re.compile(r"(://[^:/\s@'\"]+:)[^\s'\"/]*@"), r"\1[REDACTED]@"),
+    (re.compile(r"(\"[\w-]*(?:password|passwd|secret|api_key|apikey|token)[\w-]*\"\s*:\s*\")[^\"]+(\")", re.IGNORECASE), r"\1[REDACTED]\2"),
     (re.compile(r"^(\s*(?:password|secret_key|secret|token|client_secret)\s{2,})\S+", re.IGNORECASE | re.MULTILINE), r"\1[REDACTED]"),
     (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "[REDACTED]"),
     (re.compile(r"\bgh[pousr]_[A-Za-z0-9]{30,}\b"), "[REDACTED]"),
