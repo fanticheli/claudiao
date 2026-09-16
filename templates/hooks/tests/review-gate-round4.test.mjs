@@ -31,7 +31,7 @@ function driver(cwd) {
     clock,
     prompt: (prompt = 'implementa') => fire({ hook_event_name: 'UserPromptSubmit', prompt }),
     edit: (file) => fire({ hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: join(cwd, file) } }),
-    stop: () => fire({ hook_event_name: 'Stop', stop_hook_active: false }),
+    openPr: () => fire({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'gh pr create --fill' } }),
   };
 }
 
@@ -42,7 +42,7 @@ describe('round 4 finding 1: branch changes do not erase unreviewed edits', () =
     d.prompt();
     writeFileSync(join(repo, 'src', 'a.ts'), code(90));
     gitIn(repo, 'checkout', '-qb', 'feature/x');
-    assert.ok(d.stop()?.block);
+    assert.ok(d.openPr()?.deny);
   });
 
   test('committing the edits on a new branch still blocks', () => {
@@ -52,7 +52,7 @@ describe('round 4 finding 1: branch changes do not erase unreviewed edits', () =
     writeFileSync(join(repo, 'src', 'a.ts'), code(90));
     gitIn(repo, 'checkout', '-qb', 'feature/y');
     gitIn(repo, 'commit', '-qam', 'feat: y');
-    assert.ok(d.stop()?.block);
+    assert.ok(d.openPr()?.deny);
   });
 
   test('checking out an existing branch with a clean tree does not blame the turn', () => {
@@ -65,7 +65,7 @@ describe('round 4 finding 1: branch changes do not erase unreviewed edits', () =
     const d = driver(repo);
     d.prompt();
     gitIn(repo, 'checkout', '-q', 'other');
-    assert.equal(d.stop(), null);
+    assert.equal(d.openPr(), null);
   });
 
   test('switching branches and then editing counts the new edits', () => {
@@ -79,7 +79,7 @@ describe('round 4 finding 1: branch changes do not erase unreviewed edits', () =
     d.prompt();
     gitIn(repo, 'checkout', '-q', 'other');
     writeFileSync(join(repo, 'src', 'other.ts'), code(160));
-    assert.ok(d.stop()?.block);
+    assert.ok(d.openPr()?.deny);
   });
 });
 
@@ -95,9 +95,9 @@ describe('round 4 finding 2: transient git failures are retried each turn and ne
     d.clock.now += 11 * 60 * 1000;
     d.edit('src/a.ts');
     assert.ok(d.state.repos[repo]?.lateBaseline);
-    const result = d.stop();
+    const result = d.openPr();
     assert.ok(result, 'stop must not be silent');
-    assert.match(result.message ?? result.block, /Não consegui verificar/);
+    assert.match(result.message ?? result.deny, /Não consegui verificar/);
   });
 
   test('a new prompt clears the unavailable mark and tracks again', () => {
@@ -107,7 +107,7 @@ describe('round 4 finding 2: transient git failures are retried each turn and ne
     d.prompt();
     assert.ok(d.state.repos[repo]);
     writeFileSync(join(repo, 'src', 'a.ts'), code(90));
-    assert.ok(d.stop()?.block);
+    assert.ok(d.openPr()?.deny);
   });
 });
 

@@ -222,6 +222,8 @@ A partir da v1.2.0 os scripts são Node.js (`.mjs`) e funcionam em Linux, macOS 
 
 ```bash
 claudiao hooks install                         # seleção interativa dos 11 hooks bundled
+claudiao rules install                         # instala as regras globais em ~/.claude/rules
+claudiao rules list                            # mostra quais regras estão instaladas
 claudiao hooks install --only security,pr      # instala apenas os categorias informadas
 claudiao hooks list                            # mostra hooks ativos
 claudiao hooks uninstall                       # remove apenas os hooks do claudião, preserva outros
@@ -272,8 +274,8 @@ Escreve em `~/.claude/settings.json` via merge atômico (preserva o resto da con
 | `english-code` | `PreToolUse` (bloqueia) | `Write\|Edit` criando arquivo novo de código | **Nega** arquivo novo com nome ou identificadores em português (edição de arquivo existente passa) |
 | `commit-message` | `PreToolUse` (bloqueia) | `Bash` com `git` + `commit` | **Nega** mensagem fora de `type(scope): description`, escrita em português ou com atribuição de IA |
 | `credentials` | `PreToolUse` (bloqueia) + `UserPromptSubmit` | `Bash` | **Nega** credencial inline (`PGPASSWORD=`, `--password`, header `Authorization`, `user:senha@host`, `-u user:senha`); quando o segredo vem no prompt, avisa o Claude para não reusar |
-| `no-attribution` | `PreToolUse` (bloqueia) | `Bash` e MCPs de Atlassian/Slack/Gmail | **Nega** trailer de IA em commit, PR, issue, card ou mensagem — inclusive quando o texto vem de arquivo (`--body-file`, `-F`, `< arquivo`, `$(cat ...)`) |
-| `review-gate` | `PreToolUse` + `Stop` + `SubagentStop` + `UserPromptSubmit` | `Edit\|Write\|MultiEdit\|NotebookEdit\|Bash\|Agent\|Task` | Bloqueia o fim do turno enquanto houver mais de 60 linhas alteradas (git diff real) sem revisão do agente `independent-reviewer`. O usuário libera terminando a mensagem com `sem review` |
+| `no-attribution` | `PreToolUse` (bloqueia) | `Bash` e MCPs de Atlassian/Slack/Gmail | **Nega** trailer de IA em commit, PR, issue, card ou mensagem — inclusive quando o texto vem de arquivo (`--body-file`, `-F`, `< arquivo`, `$(cat ...)`) ou atrás de wrapper (`bash -c`, `xargs`, `timeout`) |
+| `review-gate` | `PreToolUse` (bloqueia) + `SubagentStop` + `UserPromptSubmit` | `Edit\|Write\|MultiEdit\|NotebookEdit\|Bash\|Agent\|Task` | Bloqueia `gh pr create` / `glab mr create` enquanto houver mais de 60 linhas alteradas (git diff real) sem revisão do agente `independent-reviewer`. O usuário libera terminando a mensagem com `sem review` |
 
 **Por que o Stop hook existe:** a validação de 18/04/2026 mostrou que os hooks `PreToolUse` cobrem bem a fase de edição, mas o fechamento (rodar `/pr-template` e `/security-checklist` completo antes do PR) continuava sendo esquecido. O hook `pr` detecta sessões que tiveram edits (via `tool_use_count`, `has_edits` ou parsing do `transcript_path`) e injeta o lembrete; sessões só-leitura passam em silêncio.
 

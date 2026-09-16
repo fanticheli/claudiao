@@ -28,7 +28,7 @@ function driver(cwd) {
     prompt: () => fire({ hook_event_name: 'UserPromptSubmit', prompt: 'implementa' }),
     launch: (prompt) => fire({ hook_event_name: 'PreToolUse', tool_name: 'Agent', tool_input: { subagent_type: REVIEWER, prompt } }),
     reviewerStop: () => fire({ hook_event_name: 'SubagentStop', agent_type: REVIEWER, agent_id: 'r' }),
-    stop: () => fire({ hook_event_name: 'Stop', stop_hook_active: false }),
+    openPr: () => fire({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'gh pr create --fill' } }),
   };
 }
 
@@ -46,7 +46,7 @@ describe('round 5 finding 1: commit followed by a branch move never escapes', ()
       d.prompt();
       writeFileSync(join(repo, 'src', 'a.ts'), code(90));
       move(repo);
-      assert.ok(d.stop()?.block, name);
+      assert.ok(d.openPr()?.deny, name);
     });
   }
 });

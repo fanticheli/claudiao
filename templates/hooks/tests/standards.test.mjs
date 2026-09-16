@@ -56,7 +56,7 @@ describe('standards-no-comments', () => {
   }
 
   const allowed = [
-    ['url in string', 'a.ts', "const url = 'https://digai.ai/jobs';"],
+    ['url in string', 'a.ts', "const url = 'https://example.com/jobs';"],
     ['double slash in string', 'a.ts', `const s = "a ${SLASHES} b";`],
     ['eslint directive', 'a.ts', `${SLASHES} eslint-disable-next-line no-console\nconsole.log(1);`],
     ['ts-expect-error', 'a.ts', `${SLASHES} @ts-expect-error legacy typing\nfoo();`],

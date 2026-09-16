@@ -10,6 +10,7 @@ import { update } from './commands/update.js';
 import { installPlugin } from './commands/install-plugin.js';
 import { installHooks, uninstallHooks, listHooks } from './commands/hooks.js';
 import { installStatusline, uninstallStatusline, listStatusline } from './commands/statusline.js';
+import { installRulesCommand, listRulesCommand } from './commands/rules.js';
 import { attributionOff, attributionOn, attributionStatus } from './commands/attribution.js';
 import { getPackageVersion } from './lib/package-info.js';
 import { MalformedSettingsError } from './lib/hooks.js';
@@ -242,6 +243,29 @@ statusline
   .description('Mostra a statusLine ativa e se foi instalada pelo claudiao')
   .action(() => {
     listStatusline();
+  });
+
+// ============================================================
+// rules
+// ============================================================
+const rules = program
+  .command('rules')
+  .description('Gerencia as regras globais em ~/.claude/rules (carregadas em toda sessao)');
+
+rules
+  .command('install')
+  .description('Instala as regras globais que os hooks claudiao-* cobram')
+  .option('--force', 'Sobrescreve regra existente que foi modificada localmente')
+  .option('--dry-run', 'Mostra o que seria feito sem executar')
+  .action((options: { force?: boolean; dryRun?: boolean }) => {
+    installRulesCommand(options);
+  });
+
+rules
+  .command('list')
+  .description('Mostra quais regras estao instaladas e quais divergem do template')
+  .action(() => {
+    listRulesCommand();
   });
 
 // ============================================================

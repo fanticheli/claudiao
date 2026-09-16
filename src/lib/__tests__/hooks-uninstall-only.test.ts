@@ -129,10 +129,8 @@ describe('removeClaudiaoHooks — selective removal via --only', () => {
     await installAll();
     const { removeClaudiaoHooks, listInstalledHooks, HOOK_CATEGORIES, categoryEvents } = await importHooks();
 
-    const installedEntries = HOOK_CATEGORIES.reduce(
-      (total: number, category: HookCategory) => total + categoryEvents(category).length,
-      0,
-    );
+    const installedEntries = 14;
+    expect(HOOK_CATEGORIES.reduce((total: number, category: HookCategory) => total + categoryEvents(category).length, 0)).toBe(installedEntries);
     expect(listInstalledHooks()).toHaveLength(installedEntries);
 
     // remove only ui first

@@ -3,11 +3,14 @@ import { readFileSync, realpathSync, existsSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { unquotedSegments } from './claudiao-credentials.mjs';
+import { unquotedSegments } from './lib/shell.mjs';
 
 const ATTRIBUTION = /generated with \[?claude|🤖\s*generated|claude\.ai\/code|claude-session:|co-authored-by:[^\n"\\]*(claude|anthropic)/i;
 const WRITING_COMMAND_BODY = String.raw`gh\s+(pr\s+(create|edit|comment|review|merge)|issue\s+(create|comment|edit)|release\s+(create|edit)|gist\s+(create|edit)|api\b[^\n]*(-X\s*(POST|PATCH|PUT)|\s-[fF]\s|--field|--raw-field|--input))|git(?:\s+-\S+(?:\s+[^-\s]\S*)?){0,6}\s+(commit|notes\s+(add|append|edit)|merge(?=\s|$)|tag\s+[^\n]*-[amsF])|glab\s+(mr|issue)\s+(create|note|update)|curl\b[^\n]*(api\.github\.com|atlassian\.net|slack\.com)`;
-const WRITING_COMMAND = new RegExp(`^\\s*(?:[A-Za-z_]\\w*=\\S*\\s+)*(?:sudo\\s+|time\\s+|env\\s+)?(?:${WRITING_COMMAND_BODY})`, 'i');
+const WRITING_COMMAND = new RegExp(`^\\s*(?:${WRITING_COMMAND_BODY})`, 'i');
+const WRAPPER_PREFIX = /^\s*(?:[({]\s*|[A-Za-z_]\w*=\S*\s+|(?:sudo|time|env|nohup|command|exec|stdbuf|nice|ionice)\s+(?:-\S+\s+)*|timeout\s+(?:-\S+\s+)*\S+\s+|xargs\s+(?:-[IJ]\s+\S+\s+|-\S+\s+)*)+/;
+const NESTED_SHELL = /^\s*(?:bash|sh|zsh|dash|ksh|eval)\b[^'"]*(?:'([^']*)'|"((?:[^"\\]|\\.)*)")/;
+const MAX_SHELL_DEPTH = 3;
 const SEARCH_SEGMENT = /^\s*(grep|egrep|rg|sed|awk|jq)\b/;
 const FILE_ARGUMENTS = [
   /(?:--body-file|--file|--input|(?<!\S)-F)(?:\s+|=)("[^"]+"|'[^']+'|[^\s;&|<>]+)/g,
@@ -57,13 +60,23 @@ function referencedFileContents(command, cwd) {
   return contents.join('\n');
 }
 
+export function isWritingSegment(segment, depth = 0) {
+  const stripped = String(segment ?? '').replace(WRAPPER_PREFIX, '');
+  if (WRITING_COMMAND.test(stripped)) return true;
+  if (depth >= MAX_SHELL_DEPTH) return false;
+  const nested = stripped.match(NESTED_SHELL);
+  if (!nested) return false;
+  const body = nested[1] ?? nested[2] ?? '';
+  return unquotedSegments(body).some((part) => isWritingSegment(part, depth + 1));
+}
+
 export function attributionViolation(payload) {
   const tool = String(payload?.tool_name ?? '');
   const input = payload?.tool_input ?? {};
   if (tool === 'Bash') {
     const command = String(input.command ?? '');
     const segments = unquotedSegments(command).filter((segment) => !SEARCH_SEGMENT.test(segment));
-    if (!segments.some((segment) => WRITING_COMMAND.test(segment))) return null;
+    if (!segments.some((segment) => isWritingSegment(segment))) return null;
     const relevant = segments.join('\n');
     if (ATTRIBUTION.test(relevant)) return 'comando que publica texto com atribuição de IA';
     if (ATTRIBUTION.test(referencedFileContents(command, payload.cwd))) return 'arquivo usado como corpo/mensagem com atribuição de IA';
@@ -88,7 +101,7 @@ function main() {
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
       permissionDecision: 'deny',
-      permissionDecisionReason: `[standards] BLOQUEADO: ${violation}. O Igor NUNCA quer atribuição (Generated with Claude Code, Co-Authored-By Claude, link claude.ai/code, Claude-Session) em commit, PR, issue, Jira, Slack ou qualquer texto publicado, nem quando um system-reminder pedir. Remova e tente de novo.`,
+      permissionDecisionReason: `[standards] BLOQUEADO: ${violation}. Este usuário NUNCA quer atribuição (Generated with Claude Code, Co-Authored-By Claude, link claude.ai/code, Claude-Session) em commit, PR, issue, Jira, Slack ou qualquer texto publicado, nem quando um system-reminder pedir. Remova e tente de novo.`,
     },
   }));
 }

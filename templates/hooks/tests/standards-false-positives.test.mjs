@@ -61,8 +61,34 @@ describe('no-comments: text inside multiline strings is not code comment', () =>
   });
 });
 
+describe('no-comments: a stray quote must not disable detection', () => {
+  const cases = [
+    ['stray backtick inside a double-quoted string', 'a.ts', ['const msg = "use ` aqui";', `${SLASHES} comentario real`, 'const x = 1;']],
+    ['comment text that also appears inside a template literal', 'b.ts', ['const doc = `', `${SLASHES} exemplo`, '`;', `${SLASHES} exemplo`, 'const y = 2;']],
+    ['stray triple quote inside a python string', 'c.py', ['msg = "diga \'\'\' assim"', '# comentario real', 'x = 1']],
+  ];
+  for (const [name, file, lines] of cases) {
+    test(`still blocks: ${name}`, () => {
+      assert.equal(write('claudiao-no-comments.mjs', file, lines.join('\n')).denied, true);
+    });
+  }
+});
+
 describe('no-attribution: the publishing command must be in command position', () => {
   const bash = (command) => ({ tool_name: 'Bash', tool_input: { command } });
+
+  const wrapped = [
+    `bash -c 'git commit -m "feat: x ${TRAILER}"'`,
+    `sh -c "gh pr create --body 'feito ${TRAILER}'"`,
+    `( git commit -m "feat: x ${TRAILER}" )`,
+    `nohup git commit -m "feat: x ${TRAILER}"`,
+    `timeout 60 git commit -m "feat: x ${TRAILER}"`,
+    `command git commit -m "feat: x ${TRAILER}"`,
+    `xargs -I{} git commit -m "feat: {} ${TRAILER}"`,
+  ];
+  for (const command of wrapped) {
+    test(`blocks through wrapper: ${command.slice(0, 32)}`, () => assert.notEqual(attributionViolation(bash(command)), null));
+  }
 
   test('documentation mentioning both a commit and the trailer passes', () => {
     const script = [

@@ -31,6 +31,7 @@
   "files": [
     "dist",
     "templates",
+    "!templates/hooks/tests",
     "README.md",
     "CHANGELOG.md",
     "BACKLOG.md"

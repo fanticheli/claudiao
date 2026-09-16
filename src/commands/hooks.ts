@@ -202,13 +202,20 @@ export function listHooks(): void {
     return;
   }
 
+  const byCategory = new Map<string, typeof installed>();
   for (const h of installed) {
-    const cat = HOOK_CATEGORIES.find((c) => c.id === h.category);
+    const key = h.category ?? h.command;
+    byCategory.set(key, [...(byCategory.get(key) ?? []), h]);
+  }
+
+  for (const [key, entries] of byCategory) {
+    const cat = HOOK_CATEGORIES.find((c) => c.id === key);
     const name = cat?.name ?? 'desconhecido';
-    const matcherLabel = h.matcher.length > 0 ? h.matcher : '(none)';
-    raw(`  ${chalk.green('●')} ${chalk.bold(name)} ${chalk.dim('[' + h.category + ']')}`);
-    dim(`event=${h.event}  matcher=${matcherLabel}`);
-    dim(`script=${h.command}`);
+    const events = entries.map((e) => e.event).join(', ');
+    const matcherLabel = entries.find((e) => e.matcher.length > 0)?.matcher ?? '(none)';
+    raw(`  ${chalk.green('●')} ${chalk.bold(name)} ${chalk.dim('[' + key + ']')}`);
+    dim(`events=${events}  matcher=${matcherLabel}`);
+    dim(`script=${entries[0].command}`);
     raw('');
   }
 

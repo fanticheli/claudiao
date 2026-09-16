@@ -48,7 +48,7 @@ describe('categories that handle more than one event', () => {
     const settings = mergeHooksIntoSettings([gate]);
 
     expect(settings.hooks?.PreToolUse?.[0].matcher).toBe(gate.matcher);
-    for (const event of ['Stop', 'SubagentStop', 'UserPromptSubmit'] as const) {
+    for (const event of ['SubagentStop', 'UserPromptSubmit'] as const) {
       const entries = settings.hooks?.[event] ?? [];
       expect(entries).toHaveLength(1);
       expect(entries[0].matcher).toBeUndefined();
@@ -75,10 +75,10 @@ describe('categories that handle more than one event', () => {
     const gate = HOOK_CATEGORIES.find((c) => c.id === 'review-gate')!;
 
     writeSettings(mergeHooksIntoSettings([gate]));
-    expect(listInstalledHooks()).toHaveLength(4);
+    expect(listInstalledHooks()).toHaveLength(3);
 
     const result = removeClaudiaoHooks(['review-gate']);
-    expect(result.removedCount).toBe(4);
+    expect(result.removedCount).toBe(3);
     expect(listInstalledHooks()).toHaveLength(0);
   });
 
