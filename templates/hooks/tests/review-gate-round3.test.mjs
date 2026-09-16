@@ -14,7 +14,7 @@ const gitIn = (root, ...args) => execFileSync('git', ['-C', root, '-c', 'user.em
 
 function createRepo() {
   const root = mkdtempSync(join(tmpdir(), 'gate3-'));
-  gitIn(root, 'init', '-q');
+  gitIn(root, 'init', '-q', '-b', 'main');
   mkdirSync(join(root, 'src'));
   writeFileSync(join(root, 'src', 'a.ts'), code(10));
   gitIn(root, 'add', '-A');
@@ -143,7 +143,7 @@ describe('round 3 finding 6: the gate keeps denying until the changes are review
     writeFileSync(join(repo, 'src', 'other.ts'), code(100));
     gitIn(repo, 'add', '-A');
     gitIn(repo, 'commit', '-qm', 'other');
-    gitIn(repo, 'checkout', '-q', 'master');
+    gitIn(repo, 'checkout', '-q', 'main');
     const d = driver(repo);
     d.prompt();
     gitIn(repo, 'checkout', '-q', 'other');
@@ -198,7 +198,7 @@ describe('round 3 finding 9: classification uses the path inside the repo', () =
     const parent = mkdtempSync(join(tmpdir(), 'gate3-parent-'));
     const root = join(parent, 'build', 'repo');
     mkdirSync(join(root, 'src'), { recursive: true });
-    gitIn(root, 'init', '-q');
+    gitIn(root, 'init', '-q', '-b', 'main');
     writeFileSync(join(root, 'src', 'a.ts'), code(5));
     gitIn(root, 'add', '-A');
     gitIn(root, 'commit', '-qm', 'i');

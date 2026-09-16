@@ -14,7 +14,7 @@ const gitIn = (root, ...args) => execFileSync('git', ['-C', root, '-c', 'user.em
 
 function createRepo() {
   const root = mkdtempSync(join(tmpdir(), 'gate4-'));
-  gitIn(root, 'init', '-q', '-b', 'main');
+  gitIn(root, 'init', '-q', '-b', 'main', '-b', 'main');
   mkdirSync(join(root, 'src'));
   writeFileSync(join(root, 'src', 'a.ts'), code(10));
   gitIn(root, 'add', '-A');

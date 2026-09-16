@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { portugueseProseEvidence } from './lib/portuguese.mjs';
 import { commandSegments } from './lib/shell.mjs';
 
@@ -57,45 +58,57 @@ function extractMessage(commitPart) {
   return fileMessage(commitPart);
 }
 
-const payload = readPayload();
-if (payload?.tool_name !== 'Bash') process.exit(0);
-const command = payload?.tool_input?.command;
-if (typeof command !== 'string') process.exit(0);
-const commitPart = commitSegment(command);
-if (!commitPart) process.exit(0);
+function main() {
+  const payload = readPayload();
+  if (payload?.tool_name !== 'Bash') return;
+  const command = payload?.tool_input?.command;
+  if (typeof command !== 'string') return;
+  const commitPart = commitSegment(command);
+  if (!commitPart) return;
 
-const message = extractMessage(commitPart);
-if (!message || !message.trim()) process.exit(0);
+  const message = extractMessage(commitPart);
+  if (!message || !message.trim()) return;
 
-const subject = message.split('\n').map((line) => line.trim()).find(Boolean) ?? '';
-const problems = [];
+  const subject = message.split('\n').map((line) => line.trim()).find(Boolean) ?? '';
+  const problems = [];
 
-if (!GIT_GENERATED.test(subject) && !CONVENTIONAL.test(subject)) {
-  problems.push(`subject fora do padrão semântico: "${subject}" (esperado: type(scope): description, types: ${TYPES.join(', ')})`);
+  if (!GIT_GENERATED.test(subject) && !CONVENTIONAL.test(subject)) {
+    problems.push(`subject fora do padrão semântico: "${subject}" (esperado: type(scope): description, types: ${TYPES.join(', ')})`);
+  }
+
+  const evidence = portugueseProseEvidence(message);
+  if (evidence.length > 0) {
+    problems.push(`mensagem em português: ${evidence.join('; ')}`);
+  }
+
+  if (ATTRIBUTION.test(message)) {
+    problems.push('atribuição de IA na mensagem (Co-Authored-By / Generated with Claude / claude.ai/code / Claude-Session)');
+  }
+
+  if (problems.length === 0) return;
+
+  const reason = [
+    '[standards] BLOQUEADO: mensagem de commit fora da regra global (~/.claude/rules/code-standards.md).',
+    ...problems.map((problem) => `  - ${problem}`),
+    'Commit SEMPRE em inglês, semantic commit: type(scope): description. Ticket no fim, se houver: (ABC-123). Sem atribuição. Não copie o idioma do git log do repo.',
+    'Exemplo: fix(queue): make the retry queue idempotent',
+  ].join('\n');
+
+  process.stdout.write(JSON.stringify({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: reason,
+    },
+  }));
 }
 
-const evidence = portugueseProseEvidence(message);
-if (evidence.length > 0) {
-  problems.push(`mensagem em português: ${evidence.join('; ')}`);
+function invokedDirectly() {
+  try {
+    return fileURLToPath(import.meta.url) === realpathSync(process.argv[1]);
+  } catch {
+    return false;
+  }
 }
 
-if (ATTRIBUTION.test(message)) {
-  problems.push('atribuição de IA na mensagem (Co-Authored-By / Generated with Claude / claude.ai/code / Claude-Session)');
-}
-
-if (problems.length === 0) process.exit(0);
-
-const reason = [
-  '[standards] BLOQUEADO: mensagem de commit fora da regra global (~/.claude/rules/code-standards.md).',
-  ...problems.map((problem) => `  - ${problem}`),
-  'Commit SEMPRE em inglês, semantic commit: type(scope): description. Ticket no fim, se houver: (ABC-123). Sem atribuição. Não copie o idioma do git log do repo.',
-  'Exemplo: fix(hired-candidate): make the hired candidate queue idempotent',
-].join('\n');
-
-process.stdout.write(JSON.stringify({
-  hookSpecificOutput: {
-    hookEventName: 'PreToolUse',
-    permissionDecision: 'deny',
-    permissionDecisionReason: reason,
-  },
-}));
+if (invokedDirectly()) main();

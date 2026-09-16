@@ -27,7 +27,7 @@ describe('state from older versions never disables the gate silently', () => {
 
   test('legacy state on disk with pending null still rebaselines on prompt and blocks on stop', () => {
     const repo = mkdtempSync(join(tmpdir(), 'gate-legacy-'));
-    gitIn(repo, 'init', '-q');
+    gitIn(repo, 'init', '-q', '-b', 'main');
     mkdirSync(join(repo, 'src'));
     writeFileSync(join(repo, 'src', 'a.ts'), 'x\n');
     gitIn(repo, 'add', '-A');
@@ -59,7 +59,7 @@ describe('tooling directories that happen to be git repos are not tracked', () =
   test('a repo under .nvm is ignored', () => {
     const root = join(mkdtempSync(join(tmpdir(), 'gate-tool-')), '.nvm');
     mkdirSync(root, { recursive: true });
-    gitIn(root, 'init', '-q');
+    gitIn(root, 'init', '-q', '-b', 'main');
     assert.equal(repoRoot(join(root, 'versions')), null);
   });
 });

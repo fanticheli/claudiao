@@ -11,8 +11,9 @@
     "dev": "tsx src/index.ts",
     "prepublishOnly": "npm run build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run src && npm run test:hooks",
-    "test:hooks": "node --test templates/hooks/tests/"
+    "test": "vitest run src && npm run test:hooks && npm run test:skill",
+    "test:hooks": "node --test templates/hooks/tests/*.test.mjs",
+    "test:skill": "python3 templates/skills/session-insights/scripts/test-extract-episodes.py"
   },
   "keywords": [
     "claude",
