@@ -331,7 +331,7 @@ function displayPath(path) {
 }
 
 function reviewBase(root, repo) {
-  return repo.reviewed || pullRequestBase(root) || repo.baseline;
+  return pullRequestBase(root) || repo.baseline;
 }
 
 function reviewableChanges(state, now, roots = null) {
@@ -348,6 +348,7 @@ function reviewableChanges(state, now, roots = null) {
       continue;
     }
     trees[root] = tree;
+    if (repo.reviewed && changedFiles(root, repo.reviewed, tree).length === 0) continue;
     files.push(...changedFiles(root, reviewBase(root, repo), tree));
   }
   return { files, trees, unverifiable };
