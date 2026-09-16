@@ -224,6 +224,9 @@ A partir da v1.2.0 os scripts são Node.js (`.mjs`) e funcionam em Linux, macOS 
 claudiao hooks install                         # seleção interativa dos 11 hooks bundled
 claudiao rules install                         # instala as regras globais em ~/.claude/rules
 claudiao rules list                            # mostra quais regras estão instaladas
+claudiao remove agent <nome>                   # remove e registra como desativado
+claudiao enable agent <nome>                   # reativa um desativado
+claudiao enable list                           # mostra o que está desativado
 claudiao hooks install --only security,pr      # instala apenas os categorias informadas
 claudiao hooks list                            # mostra hooks ativos
 claudiao hooks uninstall                       # remove apenas os hooks do claudião, preserva outros

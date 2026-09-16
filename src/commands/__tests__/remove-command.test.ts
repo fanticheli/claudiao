@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, writeFileSync, mkdirSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, writeFileSync, readFileSync, mkdirSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -13,6 +13,9 @@ vi.mock('../../lib/paths.js', () => ({
   },
   getAgentsSavePath: () => '',
   getCommandsSavePath: () => SAVE_PATH_OVERRIDE,
+  get CONFIG_FILE() {
+    return CONFIG_FILE_OVERRIDE;
+  },
 }));
 
 const promptMock = vi.fn();
@@ -25,6 +28,7 @@ vi.mock('inquirer', () => ({
 }));
 
 let COMMANDS_DIR_OVERRIDE = '';
+let CONFIG_FILE_OVERRIDE = '';
 let SAVE_PATH_OVERRIDE = '';
 let tmpRoot: string;
 
@@ -34,6 +38,7 @@ beforeEach(() => {
   tmpRoot = mkdtempSync(join(tmpdir(), 'claudiao-remove-cmd-'));
   COMMANDS_DIR_OVERRIDE = join(tmpRoot, 'commands');
   SAVE_PATH_OVERRIDE = join(tmpRoot, 'repo-commands');
+  CONFIG_FILE_OVERRIDE = join(tmpRoot, '.claudiao.json');
   mkdirSync(COMMANDS_DIR_OVERRIDE, { recursive: true });
   mkdirSync(SAVE_PATH_OVERRIDE, { recursive: true });
   promptMock.mockReset();
@@ -62,6 +67,23 @@ describe('removeCommand', () => {
 
     expect(existsSync(link)).toBe(false);
     expect(existsSync(source)).toBe(true);
+  });
+
+  it('records the removal so update does not recreate the link', async () => {
+    const source = join(SAVE_PATH_OVERRIDE, 'eod.md');
+    const link = join(COMMANDS_DIR_OVERRIDE, 'eod.md');
+    writeFileSync(source, '---\ndescription: x\n---\nbody');
+    symlinkSync(source, link);
+
+    promptMock
+      .mockResolvedValueOnce({ confirm: true })
+      .mockResolvedValueOnce({ removeSource: false });
+
+    const { removeCommand } = await importRemove();
+    await removeCommand('eod');
+
+    const config = JSON.parse(readFileSync(CONFIG_FILE_OVERRIDE, 'utf-8'));
+    expect(config.disabled.commands).toEqual(['eod']);
   });
 
   it('also removes the source file when the user opts in', async () => {
