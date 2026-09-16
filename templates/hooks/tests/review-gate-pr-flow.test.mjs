@@ -69,7 +69,7 @@ describe('a PR whose work was done in an earlier session', () => {
     assert.match(s.launchReviewer('revise tiny.ts').deny, /precisa citar os arquivos alterados/);
   });
 
-  test('a review from before the base branch moved does not shrink the scope', () => {
+  test('a review does not shrink the scope to what changed after it', () => {
     const repo = repoWithCommittedBranch();
     const s = session(repo);
     s.prompt('abre o PR');

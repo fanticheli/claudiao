@@ -7,9 +7,15 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [Unreleased]
+
 ### Adicionado
 
 - **Lista de desativados em `~/.claude/.claudiao.json`**: `init` e `update` deixam de recriar o link de agente, skill ou command que o usuário removeu. `claudiao remove` registra a remoção automaticamente, `claudiao enable <agent|skill|command> <nome>` reverte e `claudiao enable list` mostra o que está desativado.
+
+### Corrigido
+
+- `claudiao-review-gate`: depois de uma revisão, o escopo do PR voltava a ser contado a partir da árvore revisada, então o gate passava a cobrar arquivos que já tinham sido mergeados na branch base. A base agora fica sempre no merge-base, e a revisão continua valendo enquanto nada revisável mudar depois dela. Quem já instalou precisa rodar `claudiao hooks install` de novo, porque hook é cópia, não symlink.
 
 ## [1.8.0] — 2026-09-15
 
