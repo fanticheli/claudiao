@@ -19,7 +19,7 @@ import {
 import { banner, success, warn, error, info, dim, heading, separator, raw, debug } from '../lib/format.js';
 import { disableAttribution } from '../lib/attribution.js';
 import { dryRunnable } from '../lib/dry-run.js';
-import { disabledNames } from '../lib/disabled.js';
+import { disabledNames, readConfig, writeConfig } from '../lib/disabled.js';
 import { execSync } from 'node:child_process';
 
 export async function init(options?: { dryRun?: boolean }): Promise<void> {
@@ -383,12 +383,12 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
       }
     }
 
-    const config = {
+    writeConfig({
+      ...existingConfig,
       repoPath: getExternalRepoPath() || existingConfig.repoPath || undefined,
       installedAt: new Date().toISOString(),
       version: getPackageVersion(),
-    };
-    writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+    });
   }
 
   // Summary — all composite formatted lines routed through raw() so quiet

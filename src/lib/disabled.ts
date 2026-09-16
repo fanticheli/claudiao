@@ -37,7 +37,7 @@ export function isDisabled(kind: DisabledKind, name: string): boolean {
 
 export function disable(kind: DisabledKind, name: string): boolean {
   const config = readConfig();
-  const current = new Set(config.disabled?.[kind] ?? []);
+  const current = disabledNames(kind);
   if (current.has(name)) return false;
   current.add(name);
   config.disabled = { ...config.disabled, [kind]: [...current].sort() };
@@ -47,7 +47,7 @@ export function disable(kind: DisabledKind, name: string): boolean {
 
 export function enable(kind: DisabledKind, name: string): boolean {
   const config = readConfig();
-  const current = new Set(config.disabled?.[kind] ?? []);
+  const current = disabledNames(kind);
   if (!current.delete(name)) return false;
   config.disabled = { ...config.disabled, [kind]: [...current].sort() };
   writeConfig(config);

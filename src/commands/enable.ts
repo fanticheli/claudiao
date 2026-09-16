@@ -3,10 +3,12 @@ import { join } from 'node:path';
 import chalk from 'chalk';
 import { CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, CLAUDE_COMMANDS_DIR, getAgentsSource, getSkillsSource, getCommandsSource } from '../lib/paths.js';
 import { createSymlink, ensureDir } from '../lib/symlinks.js';
-import { disabledNames, enable, DisabledKind } from '../lib/disabled.js';
+import { disabledNames, enable, isDisabled, DisabledKind } from '../lib/disabled.js';
 import { banner, success, warn, error, heading, info, dim, raw } from '../lib/format.js';
 
 type ItemType = 'agent' | 'skill' | 'command';
+
+const VALID_NAME = /^[a-z][a-z0-9-]*$/;
 
 const KIND: Record<ItemType, DisabledKind> = { agent: 'agents', skill: 'skills', command: 'commands' };
 
@@ -27,26 +29,39 @@ export function enableItem(type: ItemType, name: string, options?: { dryRun?: bo
   banner();
   heading(`Reativar ${type}: ${name}`);
 
+  if (!VALID_NAME.test(name)) {
+    error(`Nome invalido: "${name}". Use letras minusculas, numeros e hifen.`);
+    return;
+  }
+
   const paths = locate(type, name);
-  if (!paths || !existsSync(paths.source)) {
+  const hasSource = Boolean(paths) && existsSync(paths!.source);
+
+  if (!hasSource && !isDisabled(KIND[type], name)) {
     error(`${type} "${name}" nao existe nos templates.`);
     dim(`Rode \`claudiao list ${KIND[type]}\` pra ver os disponiveis.`);
     return;
   }
 
-  const wasDisabled = enable(KIND[type], name);
   if (options?.dryRun) {
-    info(`[dry-run] Reativaria ${name} e linkaria em ${paths.target}`);
+    info(`[dry-run] Tiraria ${name} da lista de desativados`);
+    if (hasSource) info(`[dry-run] Linkaria em ${paths!.target}`);
     return;
   }
 
-  if (!wasDisabled) warn(`${name} nao estava na lista de desativados.`);
+  if (!enable(KIND[type], name)) warn(`${name} nao estava na lista de desativados.`);
 
-  if (existsSync(paths.target)) {
+  if (!hasSource) {
+    warn(`${name} saiu da lista, mas o fonte nao existe mais nos templates.`);
+    raw('');
+    return;
+  }
+
+  if (existsSync(paths!.target)) {
     info(`${name} ja esta instalado.`);
   } else {
     ensureDir(type === 'skill' ? CLAUDE_SKILLS_DIR : type === 'agent' ? CLAUDE_AGENTS_DIR : CLAUDE_COMMANDS_DIR);
-    createSymlink(paths.source, paths.target);
+    createSymlink(paths!.source, paths!.target);
     success(`${name} reativado e linkado.`);
   }
   raw('');
