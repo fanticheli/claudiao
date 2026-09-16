@@ -5,6 +5,12 @@ Todas as mudanças notáveis neste projeto são documentadas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [Unreleased]
+
+### Adicionado
+
+- **Lista de desativados em `~/.claude/.claudiao.json`**: `init` e `update` deixam de recriar o link de agente, skill ou command que o usuário removeu. `claudiao remove` registra a remoção automaticamente, `claudiao enable <agent|skill|command> <nome>` reverte e `claudiao enable list` mostra o que está desativado.
+
 ## [1.8.0] — 2026-09-15
 
 ### Adicionado

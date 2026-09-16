@@ -6,6 +6,7 @@ import { CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, CLAUDE_COMMANDS_DIR, getAgentsSav
 import { removeSymlink, isSymlink } from '../lib/symlinks.js';
 import { banner, success, error, heading, warn, info, dim, raw } from '../lib/format.js';
 import { dryRunnable } from '../lib/dry-run.js';
+import { disable } from '../lib/disabled.js';
 
 export async function removeAgent(name: string, options?: { dryRun?: boolean }): Promise<void> {
   const dryRun = options?.dryRun ?? false;
@@ -46,6 +47,7 @@ export async function removeAgent(name: string, options?: { dryRun?: boolean }):
     const removed = removeSymlink(symlinkPath);
     if (removed) {
       success(`Symlink removido: ~/.claude/agents/${name}.md`);
+      if (disable('agents', name)) dim('Registrado como desativado: `claudiao update` nao vai recriar. Reative com `claudiao enable agent ' + name + '`.');
     } else {
       rmSync(symlinkPath);
       success(`Arquivo removido: ~/.claude/agents/${name}.md`);
@@ -117,6 +119,7 @@ export async function removeCommand(name: string, options?: { dryRun?: boolean }
     const removed = removeSymlink(symlinkPath);
     if (removed) {
       success(`Symlink removido: ~/.claude/commands/${name}.md`);
+      if (disable('commands', name)) dim('Registrado como desativado: `claudiao update` nao vai recriar. Reative com `claudiao enable command ' + name + '`.');
     } else {
       rmSync(symlinkPath);
       success(`Arquivo removido: ~/.claude/commands/${name}.md`);
@@ -188,6 +191,7 @@ export async function removeSkill(name: string, options?: { dryRun?: boolean }):
     const removed = removeSymlink(symlinkPath);
     if (removed) {
       success(`Symlink removido: ~/.claude/skills/${name}`);
+      if (disable('skills', name)) dim('Registrado como desativado: `claudiao update` nao vai recriar. Reative com `claudiao enable skill ' + name + '`.');
     } else {
       rmSync(symlinkPath, { recursive: true });
       success(`Diretorio removido: ~/.claude/skills/${name}`);
