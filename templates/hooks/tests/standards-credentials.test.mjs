@@ -89,7 +89,7 @@ describe('standards-credentials: daily commands that must pass', () => {
     'grep SECRET_KEY=your_secret_here',
     'echo "PASSWORD=<sua-senha>" >> .env.example',
     'psql --no-password -h localhost -U postgres',
-    'docker login --password-stdin -u fanticheli ghcr.io',
+    'docker login --password-stdin -u devuser ghcr.io',
     'aws secretsmanager get-secret-value --secret-id app/prod --profile prod',
     'curl -H "Authorization: Bearer $TOKEN" https://api.x.com',
     'docker run -u 1000:1000 node:20 npm test',

@@ -223,7 +223,7 @@ function trackRepo(state, root, now) {
   if (tree) state.repos[root] = { baseline: tree, reviewed: null, lateBaseline: Boolean(state.failedThisTurn[root]) };
 }
 
-const BASE_REFS = ['origin/HEAD', 'origin/main', 'origin/master', 'main', 'master'];
+const BASE_REFS = ['origin/HEAD', 'origin/main', 'origin/master', 'origin/develop', 'origin/trunk', 'main', 'master', 'develop', 'trunk'];
 
 function gitOrEmpty(root, args) {
   try {
@@ -241,47 +241,6 @@ export function pullRequestBase(root) {
     if (base) return base;
   }
   return '';
-}
-
-export function pullRequestChanges(state, now) {
-  const files = [];
-  const unverifiable = Object.keys(state.unavailable).filter((root) => !state.repos[root]);
-  for (const [root, repo] of Object.entries(state.repos)) {
-    if (repo.lateBaseline && !unverifiable.includes(root)) unverifiable.push(root);
-  }
-  for (const [root, repo] of Object.entries(state.repos)) {
-    const tree = snapshotOrMark(state, root, now);
-    if (!tree) {
-      unverifiable.push(root);
-      continue;
-    }
-    const base = repo.reviewed || pullRequestBase(root) || repo.baseline;
-    files.push(...changedFiles(root, base, tree));
-  }
-  return { files, unverifiable };
-}
-
-function pendingChanges(state, now) {
-  const files = [];
-  const trees = {};
-  const unverifiable = Object.keys(state.unavailable).filter((root) => !state.repos[root]);
-  for (const [root, repo] of Object.entries(state.repos)) {
-    if (repo.lateBaseline && !unverifiable.includes(root)) unverifiable.push(root);
-  }
-  for (const [root, repo] of Object.entries(state.repos)) {
-    const tree = snapshotOrMark(state, root, now);
-    if (!tree) {
-      unverifiable.push(root);
-      continue;
-    }
-    trees[root] = tree;
-    files.push(...changedFiles(root, repo.reviewed ?? repo.baseline, tree));
-  }
-  return { files, trees, unverifiable };
-}
-
-function displayPath(path) {
-  return path.startsWith(`${homedir()}/`) ? `~/${relative(homedir(), path)}` : path;
 }
 
 const SAFE_QUOTED = /^(\/tmp\/|\$\{?TMPDIR)(?!.*\.\.)/;
@@ -367,6 +326,33 @@ export function readOnlyViolation(toolName, toolInput) {
   return hit ? hit[1] : gitMultipurposeViolation(shell);
 }
 
+function displayPath(path) {
+  return path.startsWith(`${homedir()}/`) ? `~/${relative(homedir(), path)}` : path;
+}
+
+function reviewBase(root, repo) {
+  return repo.reviewed || pullRequestBase(root) || repo.baseline;
+}
+
+function reviewableChanges(state, now, roots = null) {
+  const selected = roots ? roots.filter((root) => state.repos[root]) : Object.keys(state.repos);
+  const files = [];
+  const trees = {};
+  const unverifiable = Object.keys(state.unavailable).filter((root) => !state.repos[root]);
+  for (const root of selected) {
+    const repo = state.repos[root];
+    if (repo.lateBaseline && !unverifiable.includes(root)) unverifiable.push(root);
+    const tree = snapshotOrMark(state, root, now);
+    if (!tree) {
+      unverifiable.push(root);
+      continue;
+    }
+    trees[root] = tree;
+    files.push(...changedFiles(root, reviewBase(root, repo), tree));
+  }
+  return { files, trees, unverifiable };
+}
+
 export function bashRepoCandidates(command, cwd) {
   const text = String(command ?? '');
   const candidates = [cwd];
@@ -401,14 +387,14 @@ export function onPreToolUse(payload, state, now) {
   const input = payload.tool_input ?? {};
 
   if (AGENT_TOOLS.has(toolName) && input.subagent_type === REVIEWER) {
-    const { files, trees } = pendingChanges(state, now);
+    const { files, trees } = reviewableChanges(state, now);
     const names = [...new Set(files.map((file) => basename(file.path)))];
-    if (names.length === 0) return null;
-    const prompt = String(input.prompt ?? '');
-    const missing = files.filter((file) => !prompt.includes(basename(file.path)));
-    const missingNames = new Set(missing.map((file) => basename(file.path)));
-    if ((names.length - missingNames.size) * 2 < names.length) {
-      return { deny: `[review-gate] O prompt do ${REVIEWER} precisa citar os arquivos alterados. Faltam: ${[...new Set(missing.map((file) => displayPath(file.path)))].join(', ')}` };
+    if (names.length > 0) {
+      const prompt = String(input.prompt ?? '');
+      const missing = files.filter((file) => !prompt.includes(basename(file.path)));
+      if (missing.length > 0) {
+        return { deny: `[review-gate] O prompt do ${REVIEWER} precisa citar os arquivos alterados. Faltam: ${[...new Set(missing.map((file) => displayPath(file.path)))].join(', ')}` };
+      }
     }
     state.pending.push({ trees, launchedAt: now });
     return null;
@@ -419,7 +405,7 @@ export function onPreToolUse(payload, state, now) {
   } else if (toolName === 'Bash') {
     const roots = new Set(bashRepoCandidates(input.command, payload.cwd).map(repoRoot).filter(Boolean));
     for (const root of roots) trackRepo(state, root, now);
-    if (isPullRequestCommand(payload)) return pullRequestDecision(state, now);
+    if (isPullRequestCommand(payload)) return pullRequestDecision(payload, state, now);
   }
   return null;
 }
@@ -429,13 +415,26 @@ export function isPullRequestCommand(payload) {
   return commandSegments(String(payload.tool_input?.command ?? '')).some((segment) => PR_COMMAND.test(segment));
 }
 
-function pullRequestDecision(state, now) {
+function pullRequestRoots(payload, state, now) {
+  const candidates = new Set();
+  const cwdRoot = repoRoot(payload.cwd);
+  if (cwdRoot) candidates.add(cwdRoot);
+  for (const path of bashRepoCandidates(String(payload.tool_input?.command ?? ''), payload.cwd)) {
+    const root = repoRoot(path);
+    if (root) candidates.add(root);
+  }
+  for (const root of candidates) trackRepo(state, root, now);
+  const known = [...candidates].filter((root) => state.repos[root]);
+  return known.length > 0 ? known : Object.keys(state.repos);
+}
+
+function pullRequestDecision(payload, state, now) {
   if (state.skip) return null;
   state.pending = state.pending.filter((launch) => now - launch.launchedAt < PENDING_EXPIRY_MS);
   if (state.pending.length > 0) {
     return { deny: '[review-gate] Revisão independente ainda rodando. Espere o resultado, trate os achados e só então abra o PR.' };
   }
-  const { files, unverifiable } = pullRequestChanges(state, now);
+  const { files, unverifiable } = reviewableChanges(state, now, pullRequestRoots(payload, state, now));
   const warning = unverifiable.length > 0 ? `[review-gate] Não consegui verificar ${unverifiable.map(displayPath).join(', ')} (git lento ou indisponível); essas mudanças NÃO foram checadas pelo gate.` : null;
   const changedLines = files.reduce((sum, file) => sum + file.lines, 0);
   if (changedLines < MIN_CHANGED_LINES()) return warning ? { message: warning } : null;

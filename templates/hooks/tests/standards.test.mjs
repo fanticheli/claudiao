@@ -169,7 +169,7 @@ describe('standards-commit-message', () => {
 
   const allowed = [
     ['semantic english', 'git commit -m "fix(hired-candidate): make the hired candidate queue idempotent"'],
-    ['ticket suffix', 'git commit -m "feat(movement-rules): reuse the setup screen for screening creation (CET-599)"'],
+    ['ticket suffix', 'git commit -m "feat(movement-rules): reuse the setup screen for screening creation (ABC-599)"'],
     ['git -C and -am', "git -C /tmp/repo commit -am 'chore(ci): bump node to 22'"],
     ['breaking change', 'git commit -m "feat(api)!: drop the v1 endpoints"'],
     ['english heredoc with body', "git commit -m \"$(cat <<'EOF'\nrefactor(hp): extract the scoring rules\n\nThe scorer now lives in its own use case so the worker stays thin.\nEOF\n)\""],

@@ -14,7 +14,7 @@ const code = (lines, seed = 'value') => Array.from({ length: lines }, (_, i) => 
 function createRepo() {
   const root = mkdtempSync(join(tmpdir(), 'gate-repo-'));
   const run = (...args) => execFileSync('git', ['-C', root, '-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...args], { stdio: 'ignore' });
-  run('init', '-q');
+  run('init', '-q', '-b', 'main');
   mkdirSync(join(root, 'src'));
   writeFileSync(join(root, 'src', 'queue.service.ts'), code(10));
   writeFileSync(join(root, 'README.md'), '# repo\n');
@@ -37,7 +37,7 @@ function session(repo) {
     reviewerTool: (tool_name, tool_input) => fire({ hook_event_name: 'PreToolUse', tool_name, tool_input, agent_type: REVIEWER, agent_id: 'rev1', cwd: repo.root }),
     reviewerStop: () => fire({ hook_event_name: 'SubagentStop', agent_type: REVIEWER, agent_id: 'rev1' }),
     otherSubagentStop: () => fire({ hook_event_name: 'SubagentStop', agent_type: 'general-purpose', agent_id: 'gp1' }),
-    openPr: () => fire({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'gh pr create --fill' }, cwd: repo.root }),
+    openPr: (cwd = repo.root) => fire({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'gh pr create --fill' }, cwd }),
   };
 }
 
@@ -149,7 +149,8 @@ describe('review gate over real git trees', () => {
     const denied = s.launchReviewer('rode sed em probe.ts');
     assert.match(denied.deny, /a\.service\.ts/);
     assert.deepEqual(s.state.pending, []);
-    assert.equal(s.launchReviewer('arquivos: a.service.ts'), null);
+    assert.match(s.launchReviewer('arquivos: a.service.ts').deny, /b\.service\.ts/);
+    assert.equal(s.launchReviewer('arquivos: a.service.ts e b.service.ts'), null);
   });
 
   test('other subagents finishing do not count as review', () => {
@@ -213,20 +214,23 @@ describe('review gate over real git trees', () => {
     assert.equal(midSentence.openPr(), null);
   });
 
-  test('edits in another repo are tracked from the first Edit or leading cd', () => {
+  test('the PR is judged by its own repo, not by every repo touched in the session', () => {
     const other = createRepo();
     s.prompt();
-    s.preEdit('src/queue.service.ts');
     handle({ hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: join(other.root, 'src', 'queue.service.ts') }, cwd: repo.root }, s.state);
     other.write('src/queue.service.ts', code(70));
-    assert.match(s.openPr().deny, new RegExp(other.root.split('/').pop()));
 
+    assert.equal(s.openPr(), null);
+    assert.match(s.openPr(other.root).deny, new RegExp(other.root.split('/').pop()));
+  });
+
+  test('a repo reached only through a leading cd is still judged when the PR is opened there', () => {
     const third = createRepo();
     const s2 = session(repo);
     s2.prompt();
     s2.preBash(`cd ${third.root} && sed -i 's/a/b/' src/queue.service.ts`);
     third.write('src/queue.service.ts', code(70));
-    assert.ok(s2.openPr()?.deny);
+    assert.ok(s2.openPr(third.root)?.deny);
   });
 
   test('opening a PR outside any git repo does nothing', () => {

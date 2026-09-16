@@ -86,6 +86,9 @@ describe('no-attribution: the publishing command must be in command position', (
     `timeout 60 git commit -m "feat: x ${TRAILER}"`,
     `command git commit -m "feat: x ${TRAILER}"`,
     `xargs -I{} git commit -m "feat: {} ${TRAILER}"`,
+    `URL=$(git commit -m "feat: x ${TRAILER}")`,
+    `NOW=$(date +%F) git commit -m "feat: x ${TRAILER}"`,
+    `if true; then gh pr create --body "${TRAILER}"; fi`,
   ];
   for (const command of wrapped) {
     test(`blocks through wrapper: ${command.slice(0, 32)}`, () => assert.notEqual(attributionViolation(bash(command)), null));
@@ -138,6 +141,9 @@ describe('review gate: the PR command is recognized through wrappers and aliases
     'hub pull-request -m "feat: x"',
     'cd repo && gh pr create --fill',
     'timeout 60 gh pr create --fill',
+    'PR_URL=$(gh pr create --fill)',
+    'if ! gh pr view >/dev/null 2>&1; then gh pr create --fill; fi',
+    'NOW=$(date +%F) gh pr create --fill',
   ];
   for (const command of recognized) {
     test(`recognizes ${command.slice(0, 34)}`, () => assert.equal(pr(command), true));
