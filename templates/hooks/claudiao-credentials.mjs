@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { unquotedSegments } from './lib/shell.mjs';
 
 const MIN_REAL_SECRET_LENGTH = 6;
 const PLACEHOLDER_VALUE = /^(<[^>]*>|\{\{[^}]*\}\}|\w*_here|changeme|change_me|redacted|\[redacted\]|sample|example|x{3,}|\*{3,})$/i;
@@ -126,50 +127,12 @@ export function isPlaceholder(value, { literal = false, searching = false, user 
   return PLACEHOLDER_VALUE.test(trimmed) || PLACEHOLDER_FRAGMENT.test(trimmed) || DEV_VALUE.test(trimmed);
 }
 
-export function unquotedSegments(text) {
-  const source = String(text ?? '');
-  const result = [];
-  let current = '';
-  let quote = null;
-  for (let index = 0; index < source.length; index += 1) {
-    const char = source[index];
-    if (quote) {
-      current += char;
-      if (char === '\\' && quote === '"') {
-        current += source[index + 1] ?? '';
-        index += 1;
-      } else if (char === quote) {
-        quote = null;
-      }
-      continue;
-    }
-    if (char === '"' || char === "'") {
-      quote = char;
-      current += char;
-      continue;
-    }
-    const two = source.slice(index, index + 2);
-    if (two === '&&' || two === '||') {
-      result.push(current);
-      current = '';
-      index += 1;
-      continue;
-    }
-    if (char === '|' || char === ';' || char === '\n') {
-      result.push(current);
-      current = '';
-      continue;
-    }
-    current += char;
-  }
-  result.push(current);
-  return result;
-}
-
 function normalizeSegment(segment) {
   if (!SED_SEGMENT.test(segment)) return segment;
   return segment.replace(SED_SUBSTITUTION, (_, delimiter, replacement) => ` ${replacement} `);
 }
+
+export { unquotedSegments };
 
 export function credentialMatches(text) {
   const matches = [];
@@ -210,7 +173,7 @@ export function decide(payload) {
     return {
       hookSpecificOutput: {
         hookEventName: 'UserPromptSubmit',
-        additionalContext: `[standards] A mensagem do Igor contém credencial (${kinds.join(', ')}). NÃO use essa credencial em comandos, arquivos ou respostas, e não a repita. Para banco de prod use ~/.claude/scripts/db-query. Se for lease do Vault, recomende revogar ao final. Se não houver caminho sem a credencial, peça pra ele rodar o comando com ! no prompt.`,
+        additionalContext: `[standards] A mensagem do usuário contém credencial (${kinds.join(', ')}). NÃO use essa credencial em comandos, arquivos ou respostas, e não a repita. Para banco de prod use o caminho read-only sancionado do projeto. Se for lease do Vault, recomende revogar ao final. Se não houver caminho sem a credencial, peça para o usuário rodar o comando com ! no prompt.`,
       },
     };
   }
@@ -221,7 +184,7 @@ export function decide(payload) {
       hookSpecificOutput: {
         hookEventName: 'PreToolUse',
         permissionDecision: 'deny',
-        permissionDecisionReason: `[standards] BLOQUEADO: credencial inline no comando (${kinds.join(', ')}). Aprovar isso grava o segredo em settings.local.json e no transcript. Use ~/.claude/scripts/db-query para banco de prod, $(vault ...)/variável de ambiente já carregada ou ~/.pgpass. Não bloqueia: valor curto (<6), usuário igual à senha, dummy/fake/example e senhas padrão de container (postgres, mysecretpassword...). Para outros casos, peça pro Igor rodar com ! no prompt.`,
+        permissionDecisionReason: `[standards] BLOQUEADO: credencial inline no comando (${kinds.join(', ')}). Aprovar isso grava o segredo em settings.local.json e no transcript. Use o caminho read-only sancionado do projeto para banco de prod, $(vault ...)/variável de ambiente já carregada ou ~/.pgpass. Não bloqueia: valor curto (<6), usuário igual à senha, dummy/fake/example e senhas padrão de container (postgres, mysecretpassword...). Para outros casos, peça para o usuário rodar com ! no prompt.`,
       },
     };
   }

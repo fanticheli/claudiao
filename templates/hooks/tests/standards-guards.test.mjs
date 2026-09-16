@@ -29,7 +29,7 @@ describe('standards-no-attribution: inline text', () => {
     bash('gh pr create --title "feat(x): y" --body "O que foi feito"'),
     bash('grep -rn "Co-Authored-By: Claude" .'),
     bash(`echo ${TRAILER}`),
-    bash('gh pr create --body "Co-authored-by: Maria <maria@digai.ai>"'),
+    bash('gh pr create --body "Co-authored-by: Maria <maria@example.com>"'),
     bash('gh pr view 12 --json body | grep -i claude.ai/code'),
     bash('gh pr list --search "Co-Authored-By: Claude"'),
     bash(`gh api repos/o/r/pulls/1 --jq .body | grep -c ${SESSION_TRAILER.split(' ')[0]}`),

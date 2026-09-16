@@ -33,7 +33,7 @@ function driver(cwd) {
     bash: (command) => fire({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command } }),
     launch: (prompt) => fire({ hook_event_name: 'PreToolUse', tool_name: 'Agent', tool_input: { subagent_type: REVIEWER, prompt } }),
     reviewerStop: () => fire({ hook_event_name: 'SubagentStop', agent_type: REVIEWER, agent_id: 'r' }),
-    stop: (active = false) => fire({ hook_event_name: 'Stop', stop_hook_active: active }),
+    openPr: () => fire({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'gh pr create --fill' } }),
   };
 }
 
@@ -74,7 +74,7 @@ describe('round 3 finding 2: reviews without pending changes do not count', () =
     }
     assert.equal(d.state.rounds, 0);
     writeFileSync(join(repo, 'src', 'a.ts'), code(300));
-    assert.ok(d.stop()?.block);
+    assert.ok(d.openPr()?.deny);
   });
 });
 
@@ -86,12 +86,12 @@ describe('round 3 finding 3: Bash writes into repos outside the cwd are tracked'
     d.prompt();
     d.bash(`sed -i 's/a/b/' ${repo}/src/a.ts && cat > ${repo}/src/b.ts <<X\nx\nX`);
     writeFileSync(join(repo, 'src', 'b.ts'), code(200));
-    assert.ok(d.stop()?.block);
+    assert.ok(d.openPr()?.deny);
   });
 
   test('git -C, cd and ~ paths are candidates; shell variables are not', () => {
-    const candidates = bashRepoCandidates('cd ~/projetos/lovelace && git -C /srv/repo status && cat /opt/x/a.ts > $OUT/b', '/home/igorf');
-    assert.ok(candidates.some((path) => path.endsWith('/projetos/lovelace')));
+    const candidates = bashRepoCandidates('cd ~/projects/app-api && git -C /srv/repo status && cat /opt/x/a.ts > $OUT/b', '/home/dev');
+    assert.ok(candidates.some((path) => path.endsWith('/projects/app-api')));
     assert.ok(candidates.includes('/srv/repo'));
     assert.ok(candidates.includes('/opt/x/a.ts'));
     assert.ok(!candidates.some((path) => path.includes('$')));
@@ -105,11 +105,11 @@ describe('round 3 finding 4: a stuck pending review expires', () => {
     d.prompt();
     writeFileSync(join(repo, 'src', 'a.ts'), code(80));
     d.launch('a.ts');
-    assert.match(d.stop().message, /em andamento/);
+    assert.match(d.openPr().deny, /ainda rodando/);
     d.clock.now += 31 * 60 * 1000;
     d.prompt('voltei');
     writeFileSync(join(repo, 'src', 'a.ts'), code(500));
-    assert.ok(d.stop()?.block);
+    assert.ok(d.openPr()?.deny);
   });
 });
 
@@ -119,23 +119,23 @@ describe('round 3 finding 5: unreachable git is reported, not silent, and not re
     const d = driver(repo);
     d.prompt();
     rmSync(join(repo, '.git'), { recursive: true, force: true });
-    const result = d.stop();
+    const result = d.openPr();
     assert.match(result.message, /Não consegui verificar/);
     assert.ok(d.state.unavailable[repo]);
   });
 });
 
 describe('round 3 finding 6: external changes cannot loop the gate forever', () => {
-  test('blocks are capped per turn even when the tree keeps changing', () => {
+  test('every attempt to open the PR keeps being denied while the tree changes', () => {
     const repo = createRepo();
     const d = driver(repo);
     d.prompt();
-    let blocks = 0;
+    let denials = 0;
     for (let i = 0; i < 6; i += 1) {
-      writeFileSync(join(repo, 'src', `igor${i}.ts`), code(60, `k${i}`));
-      if (d.stop(true)?.block) blocks += 1;
+      writeFileSync(join(repo, 'src', `queue${i}.ts`), code(60, `k${i}`));
+      if (d.openPr()?.deny) denials += 1;
     }
-    assert.equal(blocks, 3);
+    assert.equal(denials, 6);
   });
 
   test('switching branches rebaselines instead of blaming the turn', () => {
@@ -148,7 +148,7 @@ describe('round 3 finding 6: external changes cannot loop the gate forever', () 
     const d = driver(repo);
     d.prompt();
     gitIn(repo, 'checkout', '-q', 'other');
-    assert.equal(d.stop(), null);
+    assert.equal(d.openPr(), null);
   });
 
   test('jest snapshots written during review do not invalidate it', () => {
@@ -160,7 +160,7 @@ describe('round 3 finding 6: external changes cannot loop the gate forever', () 
     mkdirSync(join(repo, 'src', '__snapshots__'), { recursive: true });
     writeFileSync(join(repo, 'src', '__snapshots__', 'a.spec.ts.snap'), code(50));
     assert.equal(d.reviewerStop(), null);
-    assert.equal(d.stop(), null);
+    assert.equal(d.openPr(), null);
   });
 });
 
@@ -171,7 +171,7 @@ describe('round 3 finding 7: templates of the claudiao count as behavior docs', 
     d.prompt();
     mkdirSync(join(repo, 'templates', 'agents'), { recursive: true });
     writeFileSync(join(repo, 'templates', 'agents', 'pr-reviewer.md'), code(60));
-    assert.ok(d.stop()?.block);
+    assert.ok(d.openPr()?.deny);
   });
 });
 
@@ -181,7 +181,7 @@ describe('round 3 finding 8: accented file names are not escaped', () => {
     const d = driver(repo);
     d.prompt();
     writeFileSync(join(repo, 'src', 'configuração.ts'), code(80));
-    assert.match(d.stop().block, /configuração\.ts/);
+    assert.match(d.openPr().deny, /configuração\.ts/);
     assert.equal(d.launch('revise src/configuração.ts'), null);
   });
 
@@ -190,7 +190,7 @@ describe('round 3 finding 8: accented file names are not escaped', () => {
     const d = driver(repo);
     d.prompt();
     writeFileSync(join(repo, 'relatório.md'), code(200));
-    assert.equal(d.stop(), null);
+    assert.equal(d.openPr(), null);
   });
 });
 
@@ -206,7 +206,7 @@ describe('round 3 finding 9: classification uses the path inside the repo', () =
     const d = driver(root);
     d.prompt();
     writeFileSync(join(root, 'src', 'a.ts'), code(400));
-    assert.ok(d.stop()?.block);
+    assert.ok(d.openPr()?.deny);
   });
 });
 
@@ -219,7 +219,7 @@ describe('round 3 finding 10: guard catches commands on later lines and bare git
 });
 
 describe('round 3 finding 11: parallel reviewers', () => {
-  test('stop keeps waiting while a second reviewer is still running', () => {
+  test('opening the PR keeps waiting while a second reviewer is still running', () => {
     const repo = createRepo();
     const d = driver(repo);
     d.prompt();
@@ -227,9 +227,9 @@ describe('round 3 finding 11: parallel reviewers', () => {
     d.launch('a.ts');
     d.launch('a.ts');
     d.reviewerStop();
-    assert.match(d.stop().message, /em andamento \(1\)/);
+    assert.match(d.openPr().deny, /ainda rodando/);
     d.reviewerStop();
-    assert.equal(d.stop(), null);
+    assert.equal(d.openPr(), null);
   });
 });
 
@@ -241,7 +241,7 @@ describe('round 3 finding 12: large untracked files are not hashed into the obje
     const count = () => execFileSync('git', ['-C', repo, 'count-objects'], { encoding: 'utf-8' });
     const before = count();
     writeFileSync(join(repo, 'big.bin'), Buffer.alloc(5 * 1024 * 1024, 7));
-    d.stop();
+    d.openPr();
     assert.equal(count(), before);
   });
 });

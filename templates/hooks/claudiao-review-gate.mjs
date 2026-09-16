@@ -6,8 +6,7 @@ import { join, dirname, basename, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const REVIEWER = 'independent-reviewer';
-const MAX_REVIEW_ROUNDS = 2;
-const MAX_BLOCKS_PER_TURN = 3;
+const PR_COMMAND = /(?:^|[;&|(]\s*|\s)(?:gh\s+pr\s+create|glab\s+mr\s+create|gh\s+api\s+\S*repos\/\S+\/pulls\b)/;
 const PENDING_EXPIRY_MS = 30 * 60 * 1000;
 const UNAVAILABLE_RETRY_MS = 10 * 60 * 1000;
 const MAX_UNTRACKED_BYTES = 2 * 1024 * 1024;
@@ -200,7 +199,7 @@ export function changedFiles(root, fromTree, toTree) {
 }
 
 export function emptyState() {
-  return { repos: {}, pending: [], rounds: 0, blocks: 0, skip: false, blockedKey: null, unavailable: {}, failedThisTurn: {} };
+  return { repos: {}, pending: [], rounds: 0, skip: false, unavailable: {}, failedThisTurn: {} };
 }
 
 function snapshotOrMark(state, root, now) {
@@ -388,8 +387,6 @@ export function onUserPromptSubmit(payload, state, now) {
   state.pending = state.pending.filter((launch) => now - launch.launchedAt < PENDING_EXPIRY_MS);
   if (state.pending.length > 0) return null;
   state.rounds = 0;
-  state.blocks = 0;
-  state.blockedKey = null;
   state.unavailable = {};
   state.failedThisTurn = {};
   const roots = new Set(Object.keys(state.repos));
@@ -423,8 +420,27 @@ export function onPreToolUse(payload, state, now) {
   } else if (toolName === 'Bash') {
     const roots = new Set(bashRepoCandidates(input.command, payload.cwd).map(repoRoot).filter(Boolean));
     for (const root of roots) trackRepo(state, root, now);
+    if (isPullRequestCommand(payload)) return pullRequestDecision(state, now);
   }
   return null;
+}
+
+export function isPullRequestCommand(payload) {
+  return payload?.tool_name === 'Bash' && PR_COMMAND.test(String(payload.tool_input?.command ?? ''));
+}
+
+function pullRequestDecision(state, now) {
+  if (state.skip) return null;
+  state.pending = state.pending.filter((launch) => now - launch.launchedAt < PENDING_EXPIRY_MS);
+  if (state.pending.length > 0) {
+    return { deny: '[review-gate] Revisão independente ainda rodando. Espere o resultado, trate os achados e só então abra o PR.' };
+  }
+  const { files, unverifiable } = pendingChanges(state, now);
+  const warning = unverifiable.length > 0 ? `[review-gate] Não consegui verificar ${unverifiable.map(displayPath).join(', ')} (git lento ou indisponível); essas mudanças NÃO foram checadas pelo gate.` : null;
+  const changedLines = files.reduce((sum, file) => sum + file.lines, 0);
+  if (changedLines < MIN_CHANGED_LINES()) return warning ? { message: warning } : null;
+  const listed = [...new Set(files.map((file) => displayPath(file.path)))];
+  return { deny: [blockReason(listed, changedLines), warning].filter(Boolean).join('\n') };
 }
 
 export function onSubagentStop(payload, state, now) {
@@ -446,40 +462,18 @@ export function onSubagentStop(payload, state, now) {
   return null;
 }
 
-export function onStop(payload, state, now) {
-  if (payload.agent_type || state.skip) return null;
-  state.pending = state.pending.filter((launch) => now - launch.launchedAt < PENDING_EXPIRY_MS);
-  if (state.pending.length > 0) {
-    return { message: `[review-gate] Revisão independente em andamento (${state.pending.length}). A resposta acima NÃO é a entrega final: espere o resultado.` };
-  }
-  const { files, trees, unverifiable } = pendingChanges(state, now);
-  const warning = unverifiable.length > 0 ? `[review-gate] Não consegui verificar ${unverifiable.map(displayPath).join(', ')} (git lento ou indisponível); essas mudanças NÃO foram checadas pelo gate.` : null;
-  const changedLines = files.reduce((sum, file) => sum + file.lines, 0);
-  if (changedLines < MIN_CHANGED_LINES()) return warning ? { message: warning } : null;
-  const listed = [...new Set(files.map((file) => displayPath(file.path)))];
-  if (state.rounds >= MAX_REVIEW_ROUNDS || state.blocks >= MAX_BLOCKS_PER_TURN) {
-    return { message: [warning, `[review-gate] Limite do turno atingido (${state.rounds} revisões, ${state.blocks} bloqueios) e ainda há ${changedLines} linhas sem revisão: ${listed.join(', ')}. Revise você antes de confiar.`].filter(Boolean).join('\n') };
-  }
-  const key = JSON.stringify(trees);
-  if (payload.stop_hook_active && state.blockedKey === key) {
-    return { message: `[review-gate] O Claude encerrou sem a revisão independente pedida. Sem revisão: ${listed.join(', ')}.` };
-  }
-  state.blockedKey = key;
-  state.blocks += 1;
-  return { block: [blockReason(listed, changedLines, state.rounds + 1), warning].filter(Boolean).join('\n') };
-}
-
-function blockReason(files, changedLines, round) {
+function blockReason(files, changedLines) {
   return [
-    `[review-gate] Há ${changedLines} linhas alteradas (git diff real) sem revisão independente (rodada ${round}/${MAX_REVIEW_ROUNDS}).`,
+    `[review-gate] PR bloqueado: ${changedLines} linhas alteradas (git diff real) sem revisão independente.`,
     `Arquivos: ${files.join(', ')}`,
     '',
-    'Antes de encerrar, obrigatoriamente:',
-    `1. Chame o Agent com subagent_type "${REVIEWER}". O prompt deve citar esses arquivos e trazer o pedido original do Igor (literal), o que você diz que fez e como diz que verificou. Não passe opinião sobre a qualidade.`,
-    '2. Não edite nada enquanto a revisão roda, senão ela é invalidada. Não apresente como pronto antes do resultado.',
-    '3. Pra cada achado blocker/major: corrija, ou refute com prova concreta.',
-    '4. Na resposta final ao Igor, inclua a seção "Revisão independente": veredito, verificações executadas, achados e o destino de cada um.',
-    'Se o Igor não quiser revisão, ele termina a mensagem com "sem review".',
+    'Antes de abrir o PR, obrigatoriamente:',
+    `1. Chame o Agent com subagent_type "${REVIEWER}". O prompt deve citar esses arquivos, o pedido original do usuário (literal), o que você diz que fez e como diz que verificou. Não passe opinião sobre a qualidade.`,
+    '2. O revisor precisa responder: o PR entrega o que foi pedido nesta sessão? Segue os padrões do projeto? Tem gambiarra, over engineering ou mudança que ninguém pediu?',
+    '3. Não edite nada enquanto a revisão roda, senão ela é invalidada.',
+    '4. Para cada achado blocker/major: corrija, ou refute com prova concreta.',
+    '5. No corpo do PR e na resposta final, inclua a seção "Revisão independente": veredito, verificações executadas, achados e o destino de cada um.',
+    'Se o usuário não quiser revisão, ele termina a mensagem com "sem review".',
   ].join('\n');
 }
 
@@ -561,9 +555,7 @@ export function normalizeState(raw) {
   if (isPlainObject(raw.repos)) state.repos = raw.repos;
   if (Array.isArray(raw.pending)) state.pending = raw.pending.filter((launch) => isPlainObject(launch) && isPlainObject(launch.trees) && typeof launch.launchedAt === 'number');
   if (Number.isInteger(raw.rounds)) state.rounds = raw.rounds;
-  if (Number.isInteger(raw.blocks)) state.blocks = raw.blocks;
   if (typeof raw.skip === 'boolean') state.skip = raw.skip;
-  if (typeof raw.blockedKey === 'string') state.blockedKey = raw.blockedKey;
   if (isPlainObject(raw.unavailable)) state.unavailable = raw.unavailable;
   if (isPlainObject(raw.failedThisTurn)) state.failedThisTurn = raw.failedThisTurn;
   return state;
@@ -576,7 +568,7 @@ export function saveState(sessionId, state) {
   renameSync(temporary, target);
 }
 
-const HANDLERS = { UserPromptSubmit: onUserPromptSubmit, PreToolUse: onPreToolUse, SubagentStop: onSubagentStop, Stop: onStop };
+const HANDLERS = { UserPromptSubmit: onUserPromptSubmit, PreToolUse: onPreToolUse, SubagentStop: onSubagentStop };
 
 export function handle(payload, state, now = Date.now()) {
   const handler = HANDLERS[payload?.hook_event_name];
@@ -584,15 +576,14 @@ export function handle(payload, state, now = Date.now()) {
   try {
     return handler(payload, state, now);
   } catch (error) {
-    if (payload.hook_event_name !== 'Stop') return null;
-    return { message: `[review-gate] Erro interno (${error instanceof Error ? error.message : String(error)}); o gate NÃO verificou este encerramento.` };
+    if (!isPullRequestCommand(payload)) return null;
+    return { message: `[review-gate] Erro interno (${error instanceof Error ? error.message : String(error)}); o gate NÃO verificou este PR.` };
   }
 }
 
 export function render(result) {
   if (!result) return null;
   if (result.deny) return { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: result.deny } };
-  if (result.block) return { decision: 'block', reason: result.block };
   if (result.message) return { systemMessage: result.message };
   return null;
 }
@@ -620,7 +611,7 @@ function main() {
   }
   if (payload.agent_type && payload.hook_event_name !== 'SubagentStop' && payload.hook_event_name !== 'PreToolUse') return;
 
-  const isStop = payload.hook_event_name === 'Stop';
+  const guarded = isPullRequestCommand(payload);
   let release;
   try {
     release = acquireLock(payload.session_id);
@@ -628,13 +619,13 @@ function main() {
     release = null;
   }
   if (!release) {
-    if (isStop) emit({ systemMessage: '[review-gate] Estado ocupado por outro hook; o gate não verificou este encerramento.' });
+    if (guarded) emit({ systemMessage: '[review-gate] Estado ocupado por outro hook; o gate não verificou este PR.' });
     return;
   }
   try {
     const state = loadState(payload.session_id);
     if (!state) {
-      if (isStop) emit({ systemMessage: '[review-gate] Estado corrompido; o gate não verificou este encerramento.' });
+      if (guarded) emit({ systemMessage: '[review-gate] Estado corrompido; o gate não verificou este PR.' });
       return;
     }
     const before = JSON.stringify(state);
@@ -642,7 +633,7 @@ function main() {
     if (JSON.stringify(state) !== before) saveState(payload.session_id, state);
     emit(output);
   } catch {
-    if (isStop) emit({ systemMessage: '[review-gate] Erro interno; o gate não verificou este encerramento.' });
+    if (guarded) emit({ systemMessage: '[review-gate] Erro interno; o gate não verificou este PR.' });
   } finally {
     try {
       release();

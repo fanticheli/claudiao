@@ -11,8 +11,7 @@ export type HookEvent =
   | 'PostToolUse'
   | 'Stop'
   | 'SubagentStop'
-  | 'UserPromptSubmit'
-  | 'SessionEnd';
+  | 'UserPromptSubmit';
 
 const MATCHER_AWARE_EVENTS: HookEvent[] = ['PreToolUse', 'PostToolUse'];
 
@@ -150,6 +149,7 @@ export const HOOK_CATEGORIES: HookCategory[] = [
     matcher: 'Bash',
     event: 'PreToolUse',
     extraEvents: ['UserPromptSubmit'],
+    extraFiles: ['lib/shell.mjs'],
   },
   {
     id: 'no-attribution',
@@ -158,15 +158,16 @@ export const HOOK_CATEGORIES: HookCategory[] = [
     script: 'claudiao-no-attribution.mjs',
     matcher: 'Bash|mcp__atlassian__.*|mcp__claude_ai_Slack__.*|mcp__claude_ai_Gmail__.*',
     event: 'PreToolUse',
+    extraFiles: ['lib/shell.mjs'],
   },
   {
     id: 'review-gate',
     name: 'Independent review gate',
-    description: 'Exige revisao do agente independent-reviewer antes de encerrar turno com muito codigo alterado',
+    description: 'Exige revisao do agente independent-reviewer antes de abrir PR com muito codigo alterado',
     script: 'claudiao-review-gate.mjs',
     matcher: 'Edit|Write|MultiEdit|NotebookEdit|Bash|Agent|Task',
     event: 'PreToolUse',
-    extraEvents: ['Stop', 'SubagentStop', 'UserPromptSubmit'],
+    extraEvents: ['SubagentStop', 'UserPromptSubmit'],
   },
   {
     id: 'pr',

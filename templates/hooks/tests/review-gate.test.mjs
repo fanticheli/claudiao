@@ -37,7 +37,7 @@ function session(repo) {
     reviewerTool: (tool_name, tool_input) => fire({ hook_event_name: 'PreToolUse', tool_name, tool_input, agent_type: REVIEWER, agent_id: 'rev1', cwd: repo.root }),
     reviewerStop: () => fire({ hook_event_name: 'SubagentStop', agent_type: REVIEWER, agent_id: 'rev1' }),
     otherSubagentStop: () => fire({ hook_event_name: 'SubagentStop', agent_type: 'general-purpose', agent_id: 'gp1' }),
-    stop: (stopHookActive = false) => fire({ hook_event_name: 'Stop', stop_hook_active: stopHookActive }),
+    openPr: () => fire({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'gh pr create --fill' }, cwd: repo.root }),
   };
 }
 
@@ -51,28 +51,43 @@ describe('review gate over real git trees', () => {
 
   test('no changes: stop is allowed', () => {
     s.prompt('explica o fluxo');
-    assert.equal(s.stop(), null);
+    assert.equal(s.openPr(), null);
   });
 
   test('large code change without review blocks with the changed file listed', () => {
     s.prompt();
     s.preEdit('src/queue.service.ts');
     repo.write('src/queue.service.ts', code(60));
-    const result = s.stop();
-    assert.match(result.block, /queue\.service\.ts/);
-    assert.match(result.block, /rodada 1\/2/);
+    const result = s.openPr();
+    assert.match(result.deny, /queue\.service\.ts/);
+    assert.match(result.deny, /PR bloqueado/);
   });
 
   test('uncommitted changes that existed before the prompt are not attributed to this turn', () => {
     repo.write('src/queue.service.ts', code(80, 'old'));
     s.prompt();
-    assert.equal(s.stop(), null);
+    assert.equal(s.openPr(), null);
   });
 
-  test('small change below 30 real diff lines is allowed', () => {
+  test('small change below the 60 line threshold is allowed', () => {
     s.prompt();
     repo.write('src/queue.service.ts', code(10).replace('value3 = 3', 'value3 = 4'));
-    assert.equal(s.stop(), null);
+    assert.equal(s.openPr(), null);
+  });
+
+  test('the line threshold decides both ways', () => {
+    s.prompt();
+    repo.write('src/queue.service.ts', code(40));
+    const previous = process.env.REVIEW_GATE_MIN_LINES;
+    try {
+      process.env.REVIEW_GATE_MIN_LINES = '1000';
+      assert.equal(s.openPr(), null);
+      process.env.REVIEW_GATE_MIN_LINES = '5';
+      assert.ok(s.openPr()?.deny);
+    } finally {
+      if (previous === undefined) delete process.env.REVIEW_GATE_MIN_LINES;
+      else process.env.REVIEW_GATE_MIN_LINES = previous;
+    }
   });
 
   test('rewriting a whole file with a one line difference counts only the real diff', () => {
@@ -81,7 +96,7 @@ describe('review gate over real git trees', () => {
     execFileSync('git', ['-C', repo.root, '-c', 'user.email=t@x', '-c', 'user.name=t', 'commit', '-qm', 'config'], { stdio: 'ignore' });
     s.prompt();
     repo.write('src/config.ts', code(200).replace('value10 = 10', 'value10 = 11'));
-    assert.equal(s.stop(), null);
+    assert.equal(s.openPr(), null);
   });
 
   test('large deletion blocks', () => {
@@ -90,14 +105,14 @@ describe('review gate over real git trees', () => {
     execFileSync('git', ['-C', repo.root, '-c', 'user.email=t@x', '-c', 'user.name=t', 'commit', '-qm', 'big'], { stdio: 'ignore' });
     s.prompt();
     rmSync(join(repo.root, 'src', 'big.ts'));
-    assert.ok(s.stop()?.block);
+    assert.ok(s.openPr()?.deny);
   });
 
   test('edits made through Bash, heredoc or subagents are caught because the tree changed', () => {
     s.prompt();
     s.preBash("cat > src/new.ts <<'EOF'\n...\nEOF");
     repo.write('src/new.ts', code(50));
-    assert.ok(s.stop()?.block);
+    assert.ok(s.openPr()?.deny);
   });
 
   test('docs and lockfiles do not count, behavior docs do', () => {
@@ -105,18 +120,18 @@ describe('review gate over real git trees', () => {
     repo.write('docs/guide.md', code(200));
     repo.write('package-lock.json', code(500));
     repo.write('docs/diagram.html', code(200));
-    assert.equal(s.stop(), null);
+    assert.equal(s.openPr(), null);
     repo.write('.claude/agents/reviewer.md', code(40));
-    assert.ok(s.stop()?.block);
+    assert.ok(s.openPr()?.deny);
   });
 
   test('completed review of the current tree releases the gate', () => {
     s.prompt();
     repo.write('src/queue.service.ts', code(60));
     assert.equal(s.launchReviewer('revise src/queue.service.ts'), null);
-    assert.match(s.stop().message, /NÃO é a entrega final/);
+    assert.match(s.openPr().deny, /ainda rodando/);
     assert.equal(s.reviewerStop(), null);
-    assert.equal(s.stop(), null);
+    assert.equal(s.openPr(), null);
   });
 
   test('reviewer prompt that does not cite the changed files is denied', () => {
@@ -134,7 +149,7 @@ describe('review gate over real git trees', () => {
     repo.write('src/queue.service.ts', code(60));
     s.launchReviewer('revise queue.service.ts');
     s.otherSubagentStop();
-    assert.match(s.stop().message, /em andamento/);
+    assert.match(s.openPr().deny, /ainda rodando/);
   });
 
   test('changes during the review invalidate it', () => {
@@ -143,20 +158,20 @@ describe('review gate over real git trees', () => {
     s.launchReviewer('revise queue.service.ts');
     repo.write('src/queue.service.ts', code(90));
     assert.match(s.reviewerStop().message, /NÃO conta/);
-    assert.ok(s.stop()?.block);
+    assert.ok(s.openPr()?.deny);
   });
 
-  test('fixes after a completed review require round 2, then only warn', () => {
+  test('edits made after a completed review require a new review', () => {
     s.prompt();
     repo.write('src/queue.service.ts', code(60));
     s.launchReviewer('queue.service.ts');
     s.reviewerStop();
+    assert.equal(s.openPr(), null);
     repo.write('src/queue.service.ts', code(100));
-    assert.match(s.stop().block, /rodada 2\/2/);
+    assert.match(s.openPr().deny, /PR bloqueado/);
     s.launchReviewer('queue.service.ts');
     s.reviewerStop();
-    repo.write('src/queue.service.ts', code(140));
-    assert.match(s.stop().message, /Limite do turno/);
+    assert.equal(s.openPr(), null);
   });
 
   test('pending review survives new prompts until the reviewer stops', () => {
@@ -166,16 +181,16 @@ describe('review gate over real git trees', () => {
     s.prompt('e aí?');
     s.prompt('terminou?');
     s.prompt('??');
-    assert.match(s.stop().message, /em andamento/);
+    assert.match(s.openPr().deny, /ainda rodando/);
     s.reviewerStop();
-    assert.equal(s.stop(), null);
+    assert.equal(s.openPr(), null);
   });
 
-  test('second stop for the same unreviewed tree warns instead of looping', () => {
+  test('a second attempt to open the same unreviewed PR is denied again', () => {
     s.prompt();
     repo.write('src/queue.service.ts', code(60));
-    assert.ok(s.stop()?.block);
-    assert.match(s.stop(true).message, /sem a revisão/);
+    assert.ok(s.openPr()?.deny);
+    assert.ok(s.openPr()?.deny);
   });
 
   test('"sem review" as a directive skips; mid-sentence does not', () => {
@@ -183,11 +198,11 @@ describe('review gate over real git trees', () => {
       const fresh = session(repo);
       fresh.prompt(prompt);
       repo.write('src/queue.service.ts', code(60, prompt.length));
-      assert.equal(fresh.stop(), null, prompt);
+      assert.equal(fresh.openPr(), null, prompt);
     }
     const midSentence = session(createRepo());
     midSentence.prompt('esse PR entrou sem review, corrige o bug do login');
-    assert.equal(midSentence.stop(), null);
+    assert.equal(midSentence.openPr(), null);
   });
 
   test('edits in another repo are tracked from the first Edit or leading cd', () => {
@@ -196,21 +211,21 @@ describe('review gate over real git trees', () => {
     s.preEdit('src/queue.service.ts');
     handle({ hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: join(other.root, 'src', 'queue.service.ts') }, cwd: repo.root }, s.state);
     other.write('src/queue.service.ts', code(70));
-    assert.match(s.stop().block, new RegExp(other.root.split('/').pop()));
+    assert.match(s.openPr().deny, new RegExp(other.root.split('/').pop()));
 
     const third = createRepo();
     const s2 = session(repo);
     s2.prompt();
     s2.preBash(`cd ${third.root} && sed -i 's/a/b/' src/queue.service.ts`);
     third.write('src/queue.service.ts', code(70));
-    assert.ok(s2.stop()?.block);
+    assert.ok(s2.openPr()?.deny);
   });
 
-  test('stop outside any git repo does nothing', () => {
+  test('opening a PR outside any git repo does nothing', () => {
     const plain = mkdtempSync(join(tmpdir(), 'gate-plain-'));
     const state = emptyState();
     handle({ hook_event_name: 'UserPromptSubmit', prompt: 'x', cwd: plain }, state);
-    assert.equal(handle({ hook_event_name: 'Stop' }, state), null);
+    assert.equal(handle({ ...{ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'gh pr create --fill' } }, cwd: plain }, state), null);
   });
 });
 
@@ -220,7 +235,7 @@ describe('reviewer read-only guard', () => {
     'npx jest src/a.spec.ts 2>&1 | tail -20', 'npm test -- src/a.spec.ts', 'npm run lint', 'npm run format:check',
     'npx prettier --check src/utils/format.ts', 'npx eslint src/ --format json', 'ruff format --check src/', 'black --check src/',
     'git apply --check /tmp/x.patch', 'grep -rn foo src 2>/dev/null', "sed -n '1,20p' src/a.ts", 'node --test tests/',
-    'mkdir -p /tmp/rv && cd /tmp/rv', 'git config --get user.email', 'git -c core.pager=cat stash list', 'git worktree list', 'git branch --show-current', 'grep -rn mv src', 'mkdir -p "$TMPDIR/rv"', 'npx tsc --noEmit > "$TMPDIR/tsc.log"', 'echo "<<END" | cat', 'aws --profile prod logs start-query --log-group-name x', '~/.claude/scripts/db-query lovelace-prod "select 1"',
+    'mkdir -p /tmp/rv && cd /tmp/rv', 'git config --get user.email', 'git -c core.pager=cat stash list', 'git worktree list', 'git branch --show-current', 'grep -rn mv src', 'mkdir -p "$TMPDIR/rv"', 'npx tsc --noEmit > "$TMPDIR/tsc.log"', 'echo "<<END" | cat', 'aws --profile prod logs start-query --log-group-name x', '~/.claude/scripts/db-query prod "select 1"',
     "cat > /tmp/rv/probe.mjs <<'EOF'\nfs.writeFileSync('src/a.ts', 'x'); // git apply > src/a.ts\nEOF", 'echo "a > b" | cat', 'cat src/a.ts | head',
   ];
   for (const command of allowed) {
@@ -275,11 +290,11 @@ describe('hook process', () => {
     };
     assert.equal(call({ hook_event_name: 'UserPromptSubmit', prompt: 'implementa' }), null);
     repo.write('src/queue.service.ts', code(60));
-    assert.equal(call({ hook_event_name: 'Stop', stop_hook_active: false }).decision, 'block');
+    assert.equal(call({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'gh pr create --fill' } }).hookSpecificOutput.permissionDecision, 'deny');
     assert.equal(call({ hook_event_name: 'PreToolUse', tool_name: 'Agent', tool_input: { subagent_type: REVIEWER, prompt: 'queue.service.ts' } }), null);
     assert.equal(call({ hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: join(repo.root, 'x.ts') }, agent_type: REVIEWER }).hookSpecificOutput.permissionDecision, 'deny');
     assert.equal(call({ hook_event_name: 'SubagentStop', agent_type: REVIEWER, agent_id: 'r' }), null);
-    assert.equal(call({ hook_event_name: 'Stop', stop_hook_active: false }), null);
+    assert.equal(call({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'gh pr create --fill' } }), null);
     assert.ok(JSON.parse(readFileSync(join(home, '.cache', 'review-gate', 's-e2e.json'), 'utf-8')).repos[repo.root].reviewed);
   });
 
@@ -293,7 +308,6 @@ describe('hook process', () => {
 
   test('render maps results to hook output formats', () => {
     assert.equal(render(null), null);
-    assert.equal(render({ block: 'r' }).decision, 'block');
     assert.equal(render({ deny: 'r' }).hookSpecificOutput.permissionDecision, 'deny');
     assert.equal(render({ message: 'm' }).systemMessage, 'm');
   });

@@ -81,7 +81,7 @@ if (ATTRIBUTION.test(message)) {
 if (problems.length === 0) process.exit(0);
 
 const reason = [
-  '[standards] BLOQUEADO: mensagem de commit fora da regra global do Igor (~/.claude/rules/code-standards.md).',
+  '[standards] BLOQUEADO: mensagem de commit fora da regra global (~/.claude/rules/code-standards.md).',
   ...problems.map((problem) => `  - ${problem}`),
   'Commit SEMPRE em inglês, semantic commit: type(scope): description. Ticket no fim, se houver: (CET-123). Sem atribuição. Não copie o idioma do git log do repo.',
   'Exemplo: fix(hired-candidate): make the hired candidate queue idempotent',

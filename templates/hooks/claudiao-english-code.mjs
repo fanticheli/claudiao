@@ -122,7 +122,7 @@ if (problems.length === 0) process.exit(0);
 
 const reason = [
   `[standards] BLOQUEADO: arquivo NOVO com nomes em português (${filePath}).`,
-  'Regra global do Igor (~/.claude/rules/code-standards.md): todo arquivo NOVO nasce 100% em inglês (nome do arquivo, variáveis, funções, classes, types, colunas), em qualquer projeto. Alterações em arquivos existentes não são bloqueadas.',
+  'Regra global (~/.claude/rules/code-standards.md): todo arquivo NOVO nasce 100% em inglês (nome do arquivo, variáveis, funções, classes, types, colunas), em qualquer projeto. Alterações em arquivos existentes não são bloqueadas.',
   `Detectado:\n${problems.slice(0, 8).map((problem) => `  - ${problem}`).join('\n')}`,
   'Renomeie para inglês (ex.: buscarCandidato -> findCandidate, vaga -> jobOpening, triagem -> screening). Nomes que já existem no banco/API externa podem ser referenciados como estão (ex.: prisma.triagem); só o que você declara precisa estar em inglês. Texto de UI/copy dentro de strings pode continuar em pt-BR.',
 ].join('\n');

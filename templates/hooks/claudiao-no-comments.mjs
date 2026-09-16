@@ -10,6 +10,7 @@ const C_STYLE = new Set([
 const MARKUP_STYLE = new Set(['vue', 'svelte', 'html', 'htm']);
 const HASH_STYLE = new Set(['py', 'rb', 'sh', 'bash', 'zsh', 'tf', 'hcl']);
 const SQL_STYLE = new Set(['sql']);
+const TRIPLE_QUOTES = ['"""', "'''"];
 
 const DIRECTIVE_BODY = String.raw`(\/\/|#|--|\/\*|\{\/\*)\s*(eslint|@ts-|prettier-ignore|istanbul|c8 |v8 |biome-ignore|tslint|jshint|type:\s*ignore|noqa|pragma|pylint|mypy|pyright|ruff|isort|fmt:|sqlfluff|go:|\+build|nolint|webpack|@vite-ignore|@jsx|@refresh|#region|#endregion|region|endregion|-\*-)`;
 const DIRECTIVE = new RegExp(`^${DIRECTIVE_BODY}`, 'i');
@@ -27,39 +28,45 @@ function stripStrings(line) {
   return line.replace(/'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`/g, '""');
 }
 
-function multilineStringContent(text, style) {
+export function multilineStringLines(text, style) {
   const source = String(text ?? '');
-  const openers = style === 'hash' ? ['"""', "'''"] : ['`'];
+  const triples = style === 'hash' ? TRIPLE_QUOTES : [];
   const inside = new Set();
-  let delimiter = null;
-  let current = '';
+  let line = 0;
+  let open = null;
   for (let index = 0; index < source.length; index += 1) {
-    if (source[index] === '\\') {
-      current += source.slice(index, index + 2);
+    const char = source[index];
+    if (char === '\\') {
       index += 1;
       continue;
     }
-    if (delimiter) {
-      if (source.startsWith(delimiter, index)) {
-        for (const line of current.split('\n')) inside.add(line.trim());
-        index += delimiter.length - 1;
-        delimiter = null;
-        current = '';
-        continue;
-      }
-      current += source[index];
+    if (char === '\n') {
+      line += 1;
+      if (open?.singleLine) open = null;
+      if (open) inside.add(line);
       continue;
     }
-    const opener = openers.find((candidate) => source.startsWith(candidate, index));
-    if (opener) {
-      delimiter = opener;
-      index += opener.length - 1;
+    if (open) {
+      if (source.startsWith(open.delimiter, index)) {
+        index += open.delimiter.length - 1;
+        open = null;
+      }
+      continue;
+    }
+    const triple = triples.find((candidate) => source.startsWith(candidate, index));
+    if (triple) {
+      open = { delimiter: triple, singleLine: false };
+      index += triple.length - 1;
+      continue;
+    }
+    if (char === '`' && style !== 'hash') {
+      open = { delimiter: '`', singleLine: false };
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      open = { delimiter: char, singleLine: true };
     }
   }
-  if (delimiter) {
-    for (const line of current.split('\n')) inside.add(line.trim());
-  }
-  inside.delete('');
   return inside;
 }
 
@@ -79,7 +86,7 @@ function isCStyleComment(trimmed, code) {
   return /\/\*.*\*\//.test(code) || /\{\/\*/.test(code);
 }
 
-function isComment(line, style) {
+export function isComment(line, style) {
   const trimmed = line.trim();
   if (!trimmed) return false;
   if (DIRECTIVE.test(trimmed)) return false;
@@ -97,35 +104,29 @@ function isComment(line, style) {
   return false;
 }
 
-function addedLines(oldText, newText) {
-  const existing = new Set(String(oldText ?? '').split('\n').map((line) => line.trim()));
-  return String(newText ?? '')
+export function offendingLines(text, baseline, style) {
+  const insideStrings = multilineStringLines(text, style);
+  const existing = new Set(String(baseline ?? '').split('\n').map((line) => line.trim()));
+  return String(text ?? '')
     .split('\n')
-    .filter((line) => !existing.has(line.trim()));
+    .filter((line, index) => !insideStrings.has(index) && !existing.has(line.trim()) && isComment(line, style));
 }
 
-function resultingTexts(toolName, input) {
-  if (toolName === 'Write') return [String(input.content ?? '')];
-  if (toolName === 'Edit') return [String(input.new_string ?? '')];
-  if (Array.isArray(input.edits)) return input.edits.map((edit) => String(edit?.new_string ?? ''));
-  return [String(input.content ?? input.new_string ?? '')];
-}
-
-function candidateLines(toolName, input) {
-  if (toolName === 'Write') {
-    let baseline = '';
-    try {
-      baseline = readFileSync(input.file_path, 'utf-8');
-    } catch {
-      baseline = '';
-    }
-    return addedLines(baseline, input.content);
+function fileBaseline(filePath) {
+  try {
+    return readFileSync(filePath, 'utf-8');
+  } catch {
+    return '';
   }
-  if (toolName === 'Edit') return addedLines(input.old_string, input.new_string);
+}
+
+function offenders(toolName, input, style) {
+  if (toolName === 'Write') return offendingLines(input.content, fileBaseline(input.file_path), style);
+  if (toolName === 'Edit') return offendingLines(input.new_string, input.old_string, style);
   if (Array.isArray(input.edits)) {
-    return input.edits.flatMap((edit) => addedLines(edit?.old_string, edit?.new_string));
+    return input.edits.flatMap((edit) => offendingLines(edit?.new_string, edit?.old_string, style));
   }
-  return addedLines('', input.content ?? input.new_string);
+  return offendingLines(input.content ?? input.new_string, '', style);
 }
 
 const payload = readPayload();
@@ -136,15 +137,10 @@ if (typeof filePath !== 'string' || !filePath) process.exit(0);
 const style = styleFor(filePath);
 if (!style) process.exit(0);
 
-const insideStrings = new Set(
-  resultingTexts(payload.tool_name ?? '', input).flatMap((text) => [...multilineStringContent(text, style)]),
-);
-const offenders = candidateLines(payload.tool_name ?? '', input)
-  .filter((line) => isComment(line, style))
-  .filter((line) => !insideStrings.has(line.trim()));
-if (offenders.length === 0) process.exit(0);
+const detected = offenders(payload.tool_name ?? '', input, style);
+if (detected.length === 0) process.exit(0);
 
-const sample = offenders
+const sample = detected
   .slice(0, 5)
   .map((line) => {
     const trimmed = line.trim();
@@ -154,7 +150,7 @@ const sample = offenders
 
 const reason = [
   `[standards] BLOQUEADO: a edição adiciona comentário em ${filePath}.`,
-  'Regra global do Igor (~/.claude/rules/code-standards.md): ZERO comentários no código, em qualquer projeto, mesmo que o CLAUDE.md do repo permita.',
+  'Regra global (~/.claude/rules/code-standards.md): ZERO comentários no código, em qualquer projeto, mesmo que o CLAUDE.md do repo permita.',
   'Reescreva sem comentários: nomes descritivos, funções pequenas. O contexto vai no corpo do PR ou na doc.',
   `Linhas detectadas:\n${sample}`,
 ].join('\n');

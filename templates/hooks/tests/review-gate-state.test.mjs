@@ -43,15 +43,15 @@ describe('state from older versions never disables the gate silently', () => {
     };
     call({ hook_event_name: 'UserPromptSubmit', prompt: 'implementa' });
     writeFileSync(join(repo, 'src', 'a.ts'), 'y\n'.repeat(80));
-    assert.equal(call({ hook_event_name: 'Stop', stop_hook_active: false })?.decision, 'block');
+    assert.equal(call({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'gh pr create --fill' } })?.hookSpecificOutput?.permissionDecision, 'deny');
   });
 });
 
-describe('internal errors on stop are visible', () => {
-  test('a handler exception during Stop becomes a system message, not silence', () => {
+describe('internal errors when opening a PR are visible', () => {
+  test('a handler exception becomes a system message, not silence', () => {
     const state = emptyState();
     state.pending = 'broken';
-    const result = handle({ hook_event_name: 'Stop' }, state);
+    const result = handle({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'gh pr create --fill' } }, state);
     assert.match(result.message, /Erro interno/);
   });
 });
