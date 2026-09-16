@@ -5,12 +5,12 @@ Todas as mudanças notáveis neste projeto são documentadas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
-## [Unreleased]
+## [1.8.0] — 2026-09-15
 
 ### Adicionado
 
 - **Skill `session-insights`**: minera o histórico de sessões (extração local, sem tokens), agrupa os erros recorrentes do Claude e propõe contramedidas, com aprovação obrigatória antes de implementar. Inclui `extract-episodes.py`, que mascara credenciais antes de truncar, e 14 testes.
-- **5 hooks de enforcement** (`english-code`, `commit-message`, `credentials`, `no-attribution`, `review-gate`), com 426 testes em `templates/hooks/tests` rodando via `node --test` no `npm test` e no CI.
+- **5 hooks de enforcement** (`english-code`, `commit-message`, `credentials`, `no-attribution`, `review-gate`), com 453 testes em `templates/hooks/tests` rodando via `node --test` no `npm test` e no CI.
 - **`claudiao rules install`** e `claudiao rules list`: instalam em `~/.claude/rules/` as regras globais que os hooks cobram. Regra editada localmente nunca é sobrescrita sem `--force`.
 - **Agente `independent-reviewer`** bundled, usado pelo `review-gate`. Além de caçar bug, ele responde se o PR entrega o que foi pedido, se segue o padrão do projeto e se tem gambiarra, over engineering ou escopo inventado.
 - `HookCategory.extraEvents`: uma categoria pode registrar o mesmo script em vários eventos. O `matcher` vale só nos eventos que o suportam.

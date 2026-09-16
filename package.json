@@ -1,7 +1,7 @@
 {
   "name": "claudiao",
-  "version": "1.7.0",
-  "description": "Seu Claude Code no próximo nível. Agentes, skills e plugins em um comando.",
+  "version": "1.8.0",
+  "description": "Seu Claude Code no pr\u00f3ximo n\u00edvel. Agentes, skills e plugins em um comando.",
   "type": "module",
   "bin": {
     "claudiao": "dist/index.js"
