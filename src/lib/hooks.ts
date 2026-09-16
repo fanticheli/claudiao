@@ -26,16 +26,7 @@ export interface HookCategory {
    */
   matcher: string | null;
   event: HookEvent;
-  /**
-   * Extra events the same script also handles (e.g. the review gate runs on
-   * PreToolUse, Stop, SubagentStop and UserPromptSubmit). `matcher` is only
-   * applied to matcher-aware events; the others are registered without one.
-   */
   extraEvents?: HookEvent[];
-  /**
-   * Files the script imports, relative to templates/hooks, copied along with
-   * it (e.g. 'lib/portuguese.mjs').
-   */
   extraFiles?: string[];
 }
 
@@ -139,7 +130,7 @@ export const HOOK_CATEGORIES: HookCategory[] = [
     script: 'claudiao-commit-message.mjs',
     matcher: 'Bash',
     event: 'PreToolUse',
-    extraFiles: ['lib/portuguese.mjs'],
+    extraFiles: ['lib/portuguese.mjs', 'lib/shell.mjs'],
   },
   {
     id: 'credentials',
@@ -168,6 +159,7 @@ export const HOOK_CATEGORIES: HookCategory[] = [
     matcher: 'Edit|Write|MultiEdit|NotebookEdit|Bash|Agent|Task',
     event: 'PreToolUse',
     extraEvents: ['SubagentStop', 'UserPromptSubmit'],
+    extraFiles: ['lib/shell.mjs'],
   },
   {
     id: 'pr',

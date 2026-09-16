@@ -37,3 +37,19 @@ export function unquotedSegments(text) {
   result.push(current);
   return result;
 }
+
+const WRAPPER_PREFIX = /^\s*(?:[({]\s*|[A-Za-z_]\w*=\S*\s+|(?:sudo|time|env|nohup|command|exec|stdbuf|nice|ionice)\s+(?:-\S+\s+)*|timeout\s+(?:-\S+\s+)*\S+\s+|xargs\s+(?:-[IJ]\s+\S+\s+|-\S+\s+)*)+/;
+const NESTED_SHELL = /^\s*(?:bash|sh|zsh|dash|ksh|eval)\b[^'"]*(?:'([^']*)'|"((?:[^"\\]|\\.)*)")/;
+const MAX_SHELL_DEPTH = 3;
+
+export function commandSegments(text, depth = 0) {
+  const segments = [];
+  for (const segment of unquotedSegments(text)) {
+    const stripped = segment.replace(WRAPPER_PREFIX, '');
+    segments.push(stripped);
+    if (depth >= MAX_SHELL_DEPTH) continue;
+    const nested = stripped.match(NESTED_SHELL);
+    if (nested) segments.push(...commandSegments(nested[1] ?? nested[2] ?? '', depth + 1));
+  }
+  return segments;
+}

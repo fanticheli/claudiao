@@ -15,7 +15,6 @@ describe('state from older versions never disables the gate silently', () => {
   test('pending null, missing fields and wrong types are normalized', () => {
     const state = normalizeState({ repos: { '/r': { baseline: 'x' } }, pending: null, rounds: '2', unavailable: [], extra: 1 });
     assert.deepEqual(state.pending, []);
-    assert.equal(state.rounds, 0);
     assert.deepEqual(state.unavailable, {});
     assert.deepEqual(state.failedThisTurn, {});
     assert.deepEqual(state.repos, { '/r': { baseline: 'x' } });

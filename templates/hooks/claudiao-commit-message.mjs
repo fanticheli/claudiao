@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
 import { portugueseProseEvidence } from './lib/portuguese.mjs';
+import { commandSegments } from './lib/shell.mjs';
 
 const TYPES = ['feat', 'fix', 'refactor', 'chore', 'docs', 'test', 'ci', 'perf', 'style', 'build', 'revert'];
 const CONVENTIONAL = new RegExp(`^(${TYPES.join('|')})(\\([\\w\\-./, ]+\\))?!?: \\S`);
 const GIT_GENERATED = /^(Merge |Revert "|fixup! |squash! |amend! )/;
-const GIT_COMMIT = /\bgit(?:\s+(?:-C|-c)\s+\S+)*\s+commit\b/;
+const GIT_COMMIT = /^\s*(?:\S*\/)?git(?:\s+(?:-C|-c)\s+\S+)*\s+commit\b/;
 const ATTRIBUTION = /co-authored-by:|generated with \[?claude|claude\.ai\/code|claude-session:|🤖/i;
 
 function readPayload() {
@@ -44,9 +45,11 @@ function fileMessage(command) {
   }
 }
 
-function extractMessage(command) {
-  const commitIndex = command.search(GIT_COMMIT);
-  const commitPart = command.slice(commitIndex);
+export function commitSegment(command) {
+  return commandSegments(command).find((segment) => GIT_COMMIT.test(segment)) ?? null;
+}
+
+function extractMessage(commitPart) {
   const heredoc = heredocBody(commitPart);
   if (heredoc !== null) return heredoc;
   const inline = inlineMessages(commitPart);
@@ -57,9 +60,11 @@ function extractMessage(command) {
 const payload = readPayload();
 if (payload?.tool_name !== 'Bash') process.exit(0);
 const command = payload?.tool_input?.command;
-if (typeof command !== 'string' || !GIT_COMMIT.test(command)) process.exit(0);
+if (typeof command !== 'string') process.exit(0);
+const commitPart = commitSegment(command);
+if (!commitPart) process.exit(0);
 
-const message = extractMessage(command);
+const message = extractMessage(commitPart);
 if (!message || !message.trim()) process.exit(0);
 
 const subject = message.split('\n').map((line) => line.trim()).find(Boolean) ?? '';
@@ -83,7 +88,7 @@ if (problems.length === 0) process.exit(0);
 const reason = [
   '[standards] BLOQUEADO: mensagem de commit fora da regra global (~/.claude/rules/code-standards.md).',
   ...problems.map((problem) => `  - ${problem}`),
-  'Commit SEMPRE em inglês, semantic commit: type(scope): description. Ticket no fim, se houver: (CET-123). Sem atribuição. Não copie o idioma do git log do repo.',
+  'Commit SEMPRE em inglês, semantic commit: type(scope): description. Ticket no fim, se houver: (ABC-123). Sem atribuição. Não copie o idioma do git log do repo.',
   'Exemplo: fix(hired-candidate): make the hired candidate queue idempotent',
 ].join('\n');
 

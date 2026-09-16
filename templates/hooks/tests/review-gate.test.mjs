@@ -63,10 +63,18 @@ describe('review gate over real git trees', () => {
     assert.match(result.deny, /PR bloqueado/);
   });
 
-  test('uncommitted changes that existed before the prompt are not attributed to this turn', () => {
+  test('uncommitted changes made before this turn still go into the PR and need review', () => {
     repo.write('src/queue.service.ts', code(80, 'old'));
     s.prompt();
-    assert.equal(s.openPr(), null);
+    assert.ok(s.openPr()?.deny);
+  });
+
+  test('changes from an earlier turn are not forgotten when the user asks for the PR later', () => {
+    s.prompt('implementa a fila');
+    s.preEdit('src/queue.service.ts');
+    repo.write('src/queue.service.ts', code(80));
+    s.prompt('abre o PR');
+    assert.ok(s.openPr()?.deny);
   });
 
   test('small change below the 60 line threshold is allowed', () => {

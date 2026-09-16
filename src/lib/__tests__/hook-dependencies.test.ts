@@ -6,16 +6,26 @@ import { HOOK_CATEGORIES } from '../hooks.js';
 const TEMPLATES_HOOKS = join(process.cwd(), 'templates', 'hooks');
 const RELATIVE_IMPORT = /from\s+'(\.\/[^']+)'/g;
 
-function relativeImports(script: string): string[] {
-  const source = readFileSync(join(TEMPLATES_HOOKS, script), 'utf-8');
-  return [...source.matchAll(RELATIVE_IMPORT)].map((match) => match[1].replace(/^\.\//, ''));
+function relativeImports(file: string): string[] {
+  const source = readFileSync(join(TEMPLATES_HOOKS, file), 'utf-8');
+  const base = dirname(file);
+  return [...source.matchAll(RELATIVE_IMPORT)].map((match) => join(base, match[1]).replace(/^\.\//, ''));
+}
+
+function transitiveImports(entry: string, seen = new Set<string>()): string[] {
+  for (const imported of relativeImports(entry)) {
+    if (seen.has(imported)) continue;
+    seen.add(imported);
+    transitiveImports(imported, seen);
+  }
+  return [...seen];
 }
 
 describe('every bundled hook installs the files it imports', () => {
   for (const category of HOOK_CATEGORIES) {
     it(`${category.id} declares its imports in extraFiles`, () => {
       const declared = new Set([category.script, ...(category.extraFiles ?? [])]);
-      for (const imported of relativeImports(category.script)) {
+      for (const imported of transitiveImports(category.script)) {
         expect(declared.has(imported), `${category.script} imports ${imported}`).toBe(true);
       }
     });
@@ -29,13 +39,11 @@ describe('every bundled hook installs the files it imports', () => {
     }
   });
 
-  it('shared libraries do not import other hooks', () => {
+  it('a hook that imports a lib which imports another lib declares both', () => {
     const libraries = new Set(HOOK_CATEGORIES.flatMap((category) => category.extraFiles ?? []));
     for (const library of libraries) {
-      const source = readFileSync(join(TEMPLATES_HOOKS, library), 'utf-8');
-      const imports = [...source.matchAll(RELATIVE_IMPORT)].map((match) => match[1]);
-      for (const imported of imports) {
-        expect(existsSync(join(dirname(join(TEMPLATES_HOOKS, library)), imported)), `${library} imports ${imported}`).toBe(true);
+      for (const imported of transitiveImports(library)) {
+        expect(existsSync(join(TEMPLATES_HOOKS, imported)), `${library} imports ${imported}`).toBe(true);
       }
     }
   });

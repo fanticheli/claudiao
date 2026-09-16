@@ -32,12 +32,15 @@ function driver(cwd) {
   };
 }
 
-describe('round 5 finding 1: commit followed by a branch move never escapes', () => {
+describe('round 5 finding 1: work committed on a branch still needs review before the PR', () => {
   const scenarios = {
-    'commit then checkout -b': (repo) => { gitIn(repo, 'commit', '-qam', 'x'); gitIn(repo, 'checkout', '-qb', 'x'); },
-    'commit then switch -c': (repo) => { gitIn(repo, 'commit', '-qam', 'x'); gitIn(repo, 'switch', '-qc', 'y'); },
-    'commit then checkout --detach': (repo) => { gitIn(repo, 'commit', '-qam', 'x'); gitIn(repo, 'checkout', '-q', '--detach'); },
-    'switch -c then commit': (repo) => { gitIn(repo, 'switch', '-qc', 'z'); gitIn(repo, 'commit', '-qam', 'x'); },
+    'branch then commit': (repo) => { gitIn(repo, 'checkout', '-qb', 'feature/x'); gitIn(repo, 'commit', '-qam', 'x'); },
+    'branch with switch then commit': (repo) => { gitIn(repo, 'switch', '-qc', 'feature/y'); gitIn(repo, 'commit', '-qam', 'x'); },
+    'branch, commit and more edits': (repo) => {
+      gitIn(repo, 'checkout', '-qb', 'feature/z');
+      gitIn(repo, 'commit', '-qam', 'x');
+      writeFileSync(join(repo, 'src', 'b.ts'), code(40, 'b'));
+    },
   };
   for (const [name, move] of Object.entries(scenarios)) {
     test(name, () => {
@@ -49,6 +52,14 @@ describe('round 5 finding 1: commit followed by a branch move never escapes', ()
       assert.ok(d.openPr()?.deny, name);
     });
   }
+
+  test('a branch with nothing new against the base branch opens without review', () => {
+    const repo = createRepo();
+    const d = driver(repo);
+    d.prompt();
+    gitIn(repo, 'checkout', '-qb', 'feature/empty');
+    assert.equal(d.openPr(), null);
+  });
 });
 
 describe('round 5 finding 2: git read flags followed by write actions are denied', () => {
