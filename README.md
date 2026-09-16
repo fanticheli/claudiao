@@ -198,13 +198,18 @@ claudiao list commands     # Lista slash commands (~/.claude/commands/), com col
 
 A coluna de origem (`core` / `external` / `local`) aparece a partir da v1.2.0 e ajuda a debugar quando um agent/skill vem do pacote bundled, do seu [repo externo](#repo-externo-avançado) ou foi criado manualmente.
 
-### Remover
+### Remover e reativar
 
 ```bash
-claudiao remove agent go-specialist
+claudiao remove agent go-specialist       # remove o link e marca como desativado
 claudiao remove skill deploy-checklist
 claudiao remove command bug
+
+claudiao enable list                      # mostra o que está desativado
+claudiao enable agent go-specialist       # reativa e volta a linkar
 ```
+
+O que você remove fica registrado em `~/.claude/.claudiao.json`, e `init`/`update` param de recriar o link. Foi feito para quem enxuga a lista de agentes e não quer vê-los voltar a cada atualização.
 
 ### Slash commands (v1.6.0+)
 

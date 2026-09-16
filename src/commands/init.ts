@@ -19,6 +19,7 @@ import {
 import { banner, success, warn, error, info, dim, heading, separator, raw, debug } from '../lib/format.js';
 import { disableAttribution } from '../lib/attribution.js';
 import { dryRunnable } from '../lib/dry-run.js';
+import { disabledNames, readConfig, writeConfig } from '../lib/disabled.js';
 import { execSync } from 'node:child_process';
 
 export async function init(options?: { dryRun?: boolean }): Promise<void> {
@@ -87,7 +88,10 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
     if (!dryRun) {
       ensureDir(CLAUDE_AGENTS_DIR);
     }
-    const agentFiles = readdirSync(agentsSource).filter(f => f.endsWith('.md'));
+    const disabledAgents = disabledNames('agents');
+    const agentFiles = readdirSync(agentsSource)
+      .filter(f => f.endsWith('.md'))
+      .filter(f => !disabledAgents.has(f.replace('.md', '')));
     agentCount = agentFiles.length;
 
     if (dryRun) {
@@ -172,9 +176,11 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
     if (!dryRun) {
       ensureDir(CLAUDE_SKILLS_DIR);
     }
+    const disabledSkills = disabledNames('skills');
     const skillDirs = readdirSync(skillsSource, { withFileTypes: true })
       .filter(d => d.isDirectory())
-      .map(d => d.name);
+      .map(d => d.name)
+      .filter(name => !disabledSkills.has(name));
     skillCount = skillDirs.length;
 
     if (dryRun) {
@@ -241,7 +247,10 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
     if (!dryRun) {
       ensureDir(CLAUDE_COMMANDS_DIR);
     }
-    const commandFiles = readdirSync(commandsSource).filter(f => f.endsWith('.md'));
+    const disabledCommands = disabledNames('commands');
+    const commandFiles = readdirSync(commandsSource)
+      .filter(f => f.endsWith('.md'))
+      .filter(f => !disabledCommands.has(f.replace('.md', '')));
     commandCount = commandFiles.length;
 
     if (dryRun) {
@@ -374,12 +383,12 @@ export async function init(options?: { dryRun?: boolean }): Promise<void> {
       }
     }
 
-    const config = {
+    writeConfig({
+      ...existingConfig,
       repoPath: getExternalRepoPath() || existingConfig.repoPath || undefined,
       installedAt: new Date().toISOString(),
       version: getPackageVersion(),
-    };
-    writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+    });
   }
 
   // Summary — all composite formatted lines routed through raw() so quiet

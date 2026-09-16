@@ -6,6 +6,13 @@ import { CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, CLAUDE_COMMANDS_DIR, getAgentsSav
 import { removeSymlink, isSymlink } from '../lib/symlinks.js';
 import { banner, success, error, heading, warn, info, dim, raw } from '../lib/format.js';
 import { dryRunnable } from '../lib/dry-run.js';
+import { disable, DisabledKind } from '../lib/disabled.js';
+
+function registerDisabled(kind: DisabledKind, singular: string, name: string): void {
+  if (disable(kind, name)) {
+    dim(`Registrado como desativado: \`claudiao update\` nao vai recriar. Reative com \`claudiao enable ${singular} ${name}\`.`);
+  }
+}
 
 export async function removeAgent(name: string, options?: { dryRun?: boolean }): Promise<void> {
   const dryRun = options?.dryRun ?? false;
@@ -46,9 +53,11 @@ export async function removeAgent(name: string, options?: { dryRun?: boolean }):
     const removed = removeSymlink(symlinkPath);
     if (removed) {
       success(`Symlink removido: ~/.claude/agents/${name}.md`);
+      registerDisabled('agents', 'agent', name);
     } else {
       rmSync(symlinkPath);
       success(`Arquivo removido: ~/.claude/agents/${name}.md`);
+      registerDisabled('agents', 'agent', name);
     }
   }, dryRemoveMsg);
 
@@ -117,9 +126,11 @@ export async function removeCommand(name: string, options?: { dryRun?: boolean }
     const removed = removeSymlink(symlinkPath);
     if (removed) {
       success(`Symlink removido: ~/.claude/commands/${name}.md`);
+      registerDisabled('commands', 'command', name);
     } else {
       rmSync(symlinkPath);
       success(`Arquivo removido: ~/.claude/commands/${name}.md`);
+      registerDisabled('commands', 'command', name);
     }
   }, dryRemoveMsg);
 
@@ -188,9 +199,11 @@ export async function removeSkill(name: string, options?: { dryRun?: boolean }):
     const removed = removeSymlink(symlinkPath);
     if (removed) {
       success(`Symlink removido: ~/.claude/skills/${name}`);
+      registerDisabled('skills', 'skill', name);
     } else {
       rmSync(symlinkPath, { recursive: true });
       success(`Diretorio removido: ~/.claude/skills/${name}`);
+      registerDisabled('skills', 'skill', name);
     }
   }, dryRemoveMsg);
 

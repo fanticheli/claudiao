@@ -14,6 +14,7 @@ import {
 } from '../lib/validate-frontmatter.js';
 import { banner, success, warn, error, heading, info, dim, raw, debug } from '../lib/format.js';
 import { dryRunnable } from '../lib/dry-run.js';
+import { disabledNames } from '../lib/disabled.js';
 
 export function update(options?: { force?: boolean; dryRun?: boolean }): void {
   const force = options?.force ?? false;
@@ -56,7 +57,10 @@ export function update(options?: { force?: boolean; dryRun?: boolean }): void {
     heading(force ? 'Re-linkando todos os agentes...' : 'Verificando novos agentes...');
     ensureDir(CLAUDE_AGENTS_DIR);
 
-    const agentFiles = readdirSync(agentsSource).filter(f => f.endsWith('.md'));
+    const disabledAgents = disabledNames('agents');
+    const agentFiles = readdirSync(agentsSource)
+      .filter(f => f.endsWith('.md'))
+      .filter(f => !disabledAgents.has(f.replace('.md', '')));
     let newAgents = 0;
     let relinkedAgents = 0;
 
@@ -109,9 +113,11 @@ export function update(options?: { force?: boolean; dryRun?: boolean }): void {
     heading(force ? 'Re-linkando todas as skills...' : 'Verificando novas skills...');
     ensureDir(CLAUDE_SKILLS_DIR);
 
+    const disabledSkills = disabledNames('skills');
     const skillDirs = readdirSync(skillsSource, { withFileTypes: true })
       .filter(d => d.isDirectory())
-      .map(d => d.name);
+      .map(d => d.name)
+      .filter(name => !disabledSkills.has(name));
     let newSkills = 0;
     let relinkedSkills = 0;
 
@@ -160,7 +166,10 @@ export function update(options?: { force?: boolean; dryRun?: boolean }): void {
     heading(force ? 'Re-linkando todos os slash commands...' : 'Verificando novos slash commands...');
     ensureDir(CLAUDE_COMMANDS_DIR);
 
-    const commandFiles = readdirSync(commandsSource).filter(f => f.endsWith('.md'));
+    const disabledCommands = disabledNames('commands');
+    const commandFiles = readdirSync(commandsSource)
+      .filter(f => f.endsWith('.md'))
+      .filter(f => !disabledCommands.has(f.replace('.md', '')));
     let newCommands = 0;
     let relinkedCommands = 0;
 
