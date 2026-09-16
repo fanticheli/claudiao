@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import type { HookCategory } from '../hooks.js';
 
 vi.mock('../paths.js', async () => {
   return {
@@ -52,28 +53,35 @@ describe('removeClaudiaoHooks — selective removal via --only', () => {
 
   it('removes only the requested category when called with --only ui', async () => {
     await installAll();
-    const { removeClaudiaoHooks, listInstalledHooks } = await importHooks();
+    const { removeClaudiaoHooks, listInstalledHooks, HOOK_CATEGORIES } = await importHooks();
 
     const result = removeClaudiaoHooks(['ui']);
     expect(result.removedCount).toBe(1);
     expect(result.categoriesRemoved).toEqual(['ui']);
 
     const remaining = listInstalledHooks();
-    const ids = remaining.map((h) => h.category).sort();
-    expect(ids).toEqual(['commit', 'migration', 'no-comments', 'pr', 'security']);
+    const ids = new Set(remaining.map((h) => h.category));
+    expect(ids.has('ui')).toBe(false);
+    for (const category of HOOK_CATEGORIES.filter((c) => c.id !== 'ui')) {
+      expect(ids.has(category.id)).toBe(true);
+    }
   });
 
   it('removes multiple categories when called with --only ui,migration', async () => {
     await installAll();
-    const { removeClaudiaoHooks, listInstalledHooks } = await importHooks();
+    const { removeClaudiaoHooks, listInstalledHooks, HOOK_CATEGORIES } = await importHooks();
 
     const result = removeClaudiaoHooks(['ui', 'migration']);
     expect(result.removedCount).toBe(2);
     expect(result.categoriesRemoved.sort()).toEqual(['migration', 'ui']);
 
     const remaining = listInstalledHooks();
-    const ids = remaining.map((h) => h.category).sort();
-    expect(ids).toEqual(['commit', 'no-comments', 'pr', 'security']);
+    const ids = new Set(remaining.map((h) => h.category));
+    expect(ids.has('ui')).toBe(false);
+    expect(ids.has('migration')).toBe(false);
+    for (const category of HOOK_CATEGORIES.filter((c) => c.id !== 'ui' && c.id !== 'migration')) {
+      expect(ids.has(category.id)).toBe(true);
+    }
   });
 
   it('preserves unrelated (non-claudiao) hooks during selective removal', async () => {
@@ -119,18 +127,19 @@ describe('removeClaudiaoHooks — selective removal via --only', () => {
 
   it('returns zero when filter does not match any installed category', async () => {
     await installAll();
-    const { removeClaudiaoHooks, listInstalledHooks } = await importHooks();
+    const { removeClaudiaoHooks, listInstalledHooks, HOOK_CATEGORIES, categoryEvents } = await importHooks();
 
-    // ensure all 6 categories are installed (security, ui, no-comments, migration, commit, pr)
-    expect(listInstalledHooks()).toHaveLength(6);
+    const installedEntries = 14;
+    expect(HOOK_CATEGORIES.reduce((total: number, category: HookCategory) => total + categoryEvents(category).length, 0)).toBe(installedEntries);
+    expect(listInstalledHooks()).toHaveLength(installedEntries);
 
     // remove only ui first
     removeClaudiaoHooks(['ui']);
-    expect(listInstalledHooks()).toHaveLength(5);
+    expect(listInstalledHooks()).toHaveLength(installedEntries - 1);
 
     // second uninstall --only ui should find nothing to remove
     const result = removeClaudiaoHooks(['ui']);
     expect(result.removedCount).toBe(0);
-    expect(listInstalledHooks()).toHaveLength(5);
+    expect(listInstalledHooks()).toHaveLength(installedEntries - 1);
   });
 });

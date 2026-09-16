@@ -1,9 +1,20 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const { warnSpy, infoSpy, rawSpy } = vi.hoisted(() => ({
+  warnSpy: vi.fn(),
+  infoSpy: vi.fn(),
+  rawSpy: vi.fn(),
+}));
+
+vi.mock('../../lib/format.js', () => ({
+  output: {
+    warn: warnSpy,
+    info: infoSpy,
+    raw: rawSpy,
+  },
+}));
 
 describe('installPlugin deprecation (v1.4.0)', () => {
-  const warnSpy = vi.fn();
-  const infoSpy = vi.fn();
-  const rawSpy = vi.fn();
   const exitSpy = vi.spyOn(process, 'exit').mockImplementation(((_code?: number) => {
     throw new Error('__exit__');
   }) as never);
@@ -14,18 +25,6 @@ describe('installPlugin deprecation (v1.4.0)', () => {
     infoSpy.mockReset();
     rawSpy.mockReset();
     exitSpy.mockClear();
-
-    vi.doMock('../../lib/format.js', () => ({
-      output: {
-        warn: warnSpy,
-        info: infoSpy,
-        raw: rawSpy,
-      },
-    }));
-  });
-
-  afterEach(() => {
-    vi.doUnmock('../../lib/format.js');
   });
 
   it('exits with code 1', async () => {

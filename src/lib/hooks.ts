@@ -1,12 +1,19 @@
 import { existsSync, readFileSync, rmSync, writeFileSync, chmodSync, copyFileSync, renameSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { CLAUDE_DIR, getTemplatesPath } from './paths.js';
 import { ensureDir } from './symlinks.js';
 
 export const SETTINGS_FILE = join(CLAUDE_DIR, 'settings.json');
 export const HOOKS_DIR = join(CLAUDE_DIR, 'hooks');
 
-export type HookEvent = 'PreToolUse' | 'PostToolUse' | 'Stop';
+export type HookEvent =
+  | 'PreToolUse'
+  | 'PostToolUse'
+  | 'Stop'
+  | 'SubagentStop'
+  | 'UserPromptSubmit';
+
+const MATCHER_AWARE_EVENTS: HookEvent[] = ['PreToolUse', 'PostToolUse'];
 
 export interface HookCategory {
   id: string;
@@ -19,6 +26,16 @@ export interface HookCategory {
    */
   matcher: string | null;
   event: HookEvent;
+  extraEvents?: HookEvent[];
+  extraFiles?: string[];
+}
+
+export function categoryEvents(category: HookCategory): HookEvent[] {
+  return [category.event, ...(category.extraEvents ?? [])];
+}
+
+export function matcherForEvent(category: HookCategory, event: HookEvent): string | null {
+  return MATCHER_AWARE_EVENTS.includes(event) ? category.matcher : null;
 }
 
 export interface ParsedOnlyFlag {
@@ -98,6 +115,53 @@ export const HOOK_CATEGORIES: HookCategory[] = [
     event: 'PreToolUse',
   },
   {
+    id: 'english-code',
+    name: 'English-only new files',
+    description: 'Bloqueia arquivo novo com nome ou identificadores em portugues',
+    script: 'claudiao-english-code.mjs',
+    matcher: 'Write|Edit',
+    event: 'PreToolUse',
+    extraFiles: ['lib/portuguese.mjs'],
+  },
+  {
+    id: 'commit-message',
+    name: 'Conventional commit enforcer',
+    description: 'Bloqueia commit fora do padrao semantico ou escrito em portugues',
+    script: 'claudiao-commit-message.mjs',
+    matcher: 'Bash',
+    event: 'PreToolUse',
+    extraFiles: ['lib/portuguese.mjs', 'lib/shell.mjs'],
+  },
+  {
+    id: 'credentials',
+    name: 'Credential guard',
+    description: 'Bloqueia credencial inline em comando e avisa quando o prompt traz segredo',
+    script: 'claudiao-credentials.mjs',
+    matcher: 'Bash',
+    event: 'PreToolUse',
+    extraEvents: ['UserPromptSubmit'],
+    extraFiles: ['lib/shell.mjs'],
+  },
+  {
+    id: 'no-attribution',
+    name: 'No AI attribution',
+    description: 'Bloqueia atribuicao de IA em commit, PR, issue, Jira e Slack',
+    script: 'claudiao-no-attribution.mjs',
+    matcher: 'Bash|mcp__atlassian__.*|mcp__claude_ai_Slack__.*|mcp__claude_ai_Gmail__.*',
+    event: 'PreToolUse',
+    extraFiles: ['lib/shell.mjs'],
+  },
+  {
+    id: 'review-gate',
+    name: 'Independent review gate',
+    description: 'Exige revisao do agente independent-reviewer antes de abrir PR com muito codigo alterado',
+    script: 'claudiao-review-gate.mjs',
+    matcher: 'Edit|Write|MultiEdit|NotebookEdit|Bash|Agent|Task',
+    event: 'PreToolUse',
+    extraEvents: ['SubagentStop', 'UserPromptSubmit'],
+    extraFiles: ['lib/shell.mjs'],
+  },
+  {
     id: 'pr',
     name: 'PR reminder',
     description: 'Lembra /pr-template e /security-checklist ao finalizar sessão com edits',
@@ -121,7 +185,7 @@ interface HookMatcher {
 }
 
 export interface SettingsJson {
-  hooks?: Partial<Record<'PreToolUse' | 'PostToolUse' | 'SessionStart' | 'Stop', HookMatcher[]>>;
+  hooks?: Partial<Record<'SessionStart' | HookEvent, HookMatcher[]>>;
   [key: string]: unknown;
 }
 
@@ -210,6 +274,15 @@ export function copyHookScripts(categories: HookCategory[]): string[] {
     chmodSync(dest, 0o755);
     copied.push(dest);
 
+    for (const extra of cat.extraFiles ?? []) {
+      const extraSrc = join(source, extra);
+      const extraDest = join(HOOKS_DIR, extra);
+      if (!existsSync(extraSrc)) continue;
+      ensureDir(dirname(extraDest));
+      copyFileSync(extraSrc, extraDest);
+      copied.push(extraDest);
+    }
+
     const legacyDest = dest.replace(/\.mjs$/, LEGACY_SCRIPT_EXT);
     if (legacyDest !== dest && existsSync(legacyDest)) {
       rmSync(legacyDest);
@@ -235,7 +308,7 @@ export function mergeHooksIntoSettings(categories: HookCategory[]): SettingsJson
   // Previously this was done inside the per-category loop, which meant
   // iteration N+1 would filter out the entries iteration N had just
   // written — losing every category except the last.
-  const eventsTouched = new Set(categories.map((c) => c.event));
+  const eventsTouched = new Set(categories.flatMap((c) => categoryEvents(c)));
   for (const event of eventsTouched) {
     const list = (settings.hooks[event] ?? []) as HookMatcher[];
     const cleaned: HookMatcher[] = [];
@@ -252,22 +325,26 @@ export function mergeHooksIntoSettings(categories: HookCategory[]): SettingsJson
 
   for (const cat of categories) {
     const command = join(HOOKS_DIR, cat.script);
-    const list = (settings.hooks[cat.event] ?? []) as HookMatcher[];
 
-    // For matcher-less events (e.g. Stop), group under entries without a
-    // `matcher` key. For matcher-aware events, group by matcher string.
-    const existing = list.find((m) =>
-      cat.matcher === null ? m.matcher === undefined : m.matcher === cat.matcher,
-    );
-    if (existing) {
-      existing.hooks.push({ type: 'command', command, timeout: 5 });
-    } else {
-      const entry: HookMatcher = { hooks: [{ type: 'command', command, timeout: 5 }] };
-      if (cat.matcher !== null) entry.matcher = cat.matcher;
-      list.push(entry);
+    for (const event of categoryEvents(cat)) {
+      const list = (settings.hooks[event] ?? []) as HookMatcher[];
+      const matcher = matcherForEvent(cat, event);
+
+      // For matcher-less events (e.g. Stop), group under entries without a
+      // `matcher` key. For matcher-aware events, group by matcher string.
+      const existing = list.find((m) =>
+        matcher === null ? m.matcher === undefined : m.matcher === matcher,
+      );
+      if (existing) {
+        existing.hooks.push({ type: 'command', command, timeout: 5 });
+      } else {
+        const entry: HookMatcher = { hooks: [{ type: 'command', command, timeout: 5 }] };
+        if (matcher !== null) entry.matcher = matcher;
+        list.push(entry);
+      }
+
+      settings.hooks[event] = list;
     }
-
-    settings.hooks[cat.event] = list;
   }
 
   return settings;
