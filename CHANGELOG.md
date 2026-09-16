@@ -19,7 +19,8 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ### Alterado
 
-- O `review-gate` passou a bloquear **na abertura do PR** (`gh pr create`, `glab mr create`), em vez de bloquear o fim de cada turno. Menos atrito no dia a dia e revisão no momento em que ela vale.
+- O `review-gate` passou a bloquear **na abertura do PR** (`gh pr create`, `glab mr create`, `hub pull-request`, `gh api .../pulls`, inclusive atrás de `bash -c`, `eval`, `timeout` e caminho absoluto), em vez de bloquear o fim de cada turno.
+- A base de comparação do gate passou a ser o **merge-base com a branch base** (`origin/HEAD`, `main`, `master`), e não mais a árvore do início do turno: o que conta é o que vai no PR, mesmo feito em turnos ou sessões anteriores. Com isso saíram a heurística de reflog/checkout, o contador de rodadas e o rebaseline a cada mensagem.
 - `claudiao hooks list` agrupa por categoria em vez de repetir o mesmo script uma vez por evento.
 - `templates/hooks/tests` não é mais publicado no npm.
 
@@ -28,7 +29,8 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - `claudiao-no-attribution` não instalava `claudiao-credentials.mjs`, do qual dependia: instalar só essa categoria gerava um hook que quebrava em toda chamada. A função compartilhada virou `lib/shell.mjs`, declarada em `extraFiles`, e um teste garante que todo `import` relativo de hook está declarado.
 - `claudiao-no-attribution` deixava passar atribuição atrás de wrapper (`bash -c`, `sh -c`, parênteses, `nohup`, `timeout`, `command`, `xargs`).
 - `claudiao-no-comments` desligava a detecção do arquivo inteiro quando havia uma crase solta dentro de string: o filtro passou a usar posição de linha, e o scanner reconhece aspas simples e duplas.
-- `claudiao-no-comments` acusava comentário em texto dentro de string multilinha (docstring com título markdown, template literal com barras).
+- `claudiao-no-comments` acusava comentário em texto dentro de string multilinha (docstring com título markdown, template literal com barras), e agora expõe suas funções sem executar o CLI ao ser importado.
+- `claudiao-commit-message` bloqueava qualquer comando que apenas mencionasse `git commit` dentro de uma string (`sed`, `echo` de JSON). Passou a usar `lib/shell.mjs` e só considera segmento que começa com `git ... commit`.
 - `claudiao-no-attribution` bloqueava documentação que citava um commit e os termos de atribuição na mesma linha. O regex do `git` também deixou de ter backtracking exponencial.
 - Hosts de banco, usuários de Vault e dados pessoais saíram das fixtures e das mensagens dos hooks.
 - `npm test` rodava também os testes compilados em `dist/`, desatualizados e falhando. Agora roda `vitest run src` mais os testes dos hooks.

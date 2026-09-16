@@ -177,6 +177,8 @@ describe('standards-commit-message', () => {
     ['amend no edit', 'git commit --amend --no-edit'],
     ['merge message', "git commit -m \"Merge branch 'main' into feature/x\""],
     ['not a commit', 'git status && git log --oneline -5'],
+    ['commit mentioned inside a sed expression', "sed 's/git commit -qm init/git commit -qm x/' run.sh > run2.sh"],
+    ['commit mentioned inside an echoed json payload', 'echo \'{"command":"git commit -m bad"}\''],
     ['portuguese company scope', 'git commit -m "feat(recrutamento): add the final HP score"'],
   ];
   for (const [name, command] of allowed) {

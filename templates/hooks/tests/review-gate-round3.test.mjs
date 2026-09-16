@@ -72,7 +72,6 @@ describe('round 3 finding 2: reviews without pending changes do not count', () =
       assert.equal(d.launch('diga OK'), null);
       d.reviewerStop();
     }
-    assert.equal(d.state.rounds, 0);
     writeFileSync(join(repo, 'src', 'a.ts'), code(300));
     assert.ok(d.openPr()?.deny);
   });
@@ -125,7 +124,7 @@ describe('round 3 finding 5: unreachable git is reported, not silent, and not re
   });
 });
 
-describe('round 3 finding 6: external changes cannot loop the gate forever', () => {
+describe('round 3 finding 6: the gate keeps denying until the changes are reviewed', () => {
   test('every attempt to open the PR keeps being denied while the tree changes', () => {
     const repo = createRepo();
     const d = driver(repo);
@@ -138,7 +137,7 @@ describe('round 3 finding 6: external changes cannot loop the gate forever', () 
     assert.equal(denials, 6);
   });
 
-  test('switching branches rebaselines instead of blaming the turn', () => {
+  test('a branch that is ahead of the base branch needs review even without edits in this turn', () => {
     const repo = createRepo();
     gitIn(repo, 'checkout', '-qb', 'other');
     writeFileSync(join(repo, 'src', 'other.ts'), code(100));
@@ -148,7 +147,7 @@ describe('round 3 finding 6: external changes cannot loop the gate forever', () 
     const d = driver(repo);
     d.prompt();
     gitIn(repo, 'checkout', '-q', 'other');
-    assert.equal(d.openPr(), null);
+    assert.ok(d.openPr()?.deny);
   });
 
   test('jest snapshots written during review do not invalidate it', () => {

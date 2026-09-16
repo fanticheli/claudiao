@@ -4,9 +4,10 @@ import { readFileSync, writeFileSync, mkdirSync, copyFileSync, rmSync, mkdtempSy
 import { homedir, tmpdir } from 'node:os';
 import { join, dirname, basename, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { commandSegments } from './lib/shell.mjs';
 
 export const REVIEWER = 'independent-reviewer';
-const PR_COMMAND = /(?:^|[;&|(]\s*|\s)(?:gh\s+pr\s+create|glab\s+mr\s+create|gh\s+api\s+\S*repos\/\S+\/pulls\b)/;
+const PR_COMMAND = /^\s*(?:\S*\/)?(?:gh\s+(?:pr\s+create\b|api\b[^\n]*\/pulls\b)|glab\s+mr\s+create\b|hub\s+pull-request\b|git\s+push\b[^\n]*merge_request\.create)/;
 const PENDING_EXPIRY_MS = 30 * 60 * 1000;
 const UNAVAILABLE_RETRY_MS = 10 * 60 * 1000;
 const MAX_UNTRACKED_BYTES = 2 * 1024 * 1024;
@@ -199,7 +200,7 @@ export function changedFiles(root, fromTree, toTree) {
 }
 
 export function emptyState() {
-  return { repos: {}, pending: [], rounds: 0, skip: false, unavailable: {}, failedThisTurn: {} };
+  return { repos: {}, pending: [], skip: false, unavailable: {}, failedThisTurn: {} };
 }
 
 function snapshotOrMark(state, root, now) {
@@ -216,45 +217,48 @@ function snapshotOrMark(state, root, now) {
   }
 }
 
-function currentHead(root) {
-  try {
-    return git(root, ['rev-parse', '--verify', '--quiet', 'HEAD']).trim() || null;
-  } catch {
-    return null;
-  }
-}
-
-function headReflog(root) {
-  try {
-    return git(root, ['reflog', '--format=%gs', 'HEAD']).split('\n').filter(Boolean);
-  } catch {
-    return null;
-  }
-}
-
-function onlyCheckoutsSince(root, reflogSize) {
-  const entries = headReflog(root);
-  if (!entries || typeof reflogSize !== 'number') return false;
-  const newMoves = entries.slice(0, entries.length - reflogSize);
-  return newMoves.length > 0 && newMoves.every((subject) => /^(checkout|switch):/.test(subject));
-}
-
-function pathsBetween(root, from, to) {
-  return new Set(git(root, ['diff', '--name-only', '--no-renames', '-z', from, to]).split('\0').filter(Boolean));
-}
-
-function withoutCheckoutEffects(root, repo, tree, files) {
-  const head = currentHead(root);
-  if (!repo.head || !head || head === repo.head || !onlyCheckoutsSince(root, repo.reflogSize)) return files;
-  const broughtByCheckout = pathsBetween(root, repo.head, head);
-  const differsFromNewHead = pathsBetween(root, head, tree);
-  return files.filter((file) => !broughtByCheckout.has(file.relativePath) || differsFromNewHead.has(file.relativePath));
-}
-
 function trackRepo(state, root, now) {
   if (!root || state.repos[root]) return;
   const tree = snapshotOrMark(state, root, now);
-  if (tree) state.repos[root] = { baseline: tree, reviewed: null, head: currentHead(root), reflogSize: headReflog(root)?.length ?? null, lateBaseline: Boolean(state.failedThisTurn[root]) };
+  if (tree) state.repos[root] = { baseline: tree, reviewed: null, lateBaseline: Boolean(state.failedThisTurn[root]) };
+}
+
+const BASE_REFS = ['origin/HEAD', 'origin/main', 'origin/master', 'main', 'master'];
+
+function gitOrEmpty(root, args) {
+  try {
+    return git(root, args).trim();
+  } catch {
+    return '';
+  }
+}
+
+export function pullRequestBase(root) {
+  for (const ref of BASE_REFS) {
+    const resolved = gitOrEmpty(root, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]);
+    if (!resolved) continue;
+    const base = gitOrEmpty(root, ['merge-base', 'HEAD', resolved]);
+    if (base) return base;
+  }
+  return '';
+}
+
+export function pullRequestChanges(state, now) {
+  const files = [];
+  const unverifiable = Object.keys(state.unavailable).filter((root) => !state.repos[root]);
+  for (const [root, repo] of Object.entries(state.repos)) {
+    if (repo.lateBaseline && !unverifiable.includes(root)) unverifiable.push(root);
+  }
+  for (const [root, repo] of Object.entries(state.repos)) {
+    const tree = snapshotOrMark(state, root, now);
+    if (!tree) {
+      unverifiable.push(root);
+      continue;
+    }
+    const base = repo.reviewed || pullRequestBase(root) || repo.baseline;
+    files.push(...changedFiles(root, base, tree));
+  }
+  return { files, unverifiable };
 }
 
 function pendingChanges(state, now) {
@@ -271,7 +275,7 @@ function pendingChanges(state, now) {
       continue;
     }
     trees[root] = tree;
-    files.push(...withoutCheckoutEffects(root, repo, tree, changedFiles(root, repo.reviewed ?? repo.baseline, tree)));
+    files.push(...changedFiles(root, repo.reviewed ?? repo.baseline, tree));
   }
   return { files, trees, unverifiable };
 }
@@ -386,14 +390,9 @@ export function onUserPromptSubmit(payload, state, now) {
   state.skip = SKIP_DIRECTIVE.test(String(payload.prompt ?? '').trim());
   state.pending = state.pending.filter((launch) => now - launch.launchedAt < PENDING_EXPIRY_MS);
   if (state.pending.length > 0) return null;
-  state.rounds = 0;
   state.unavailable = {};
   state.failedThisTurn = {};
-  const roots = new Set(Object.keys(state.repos));
-  const cwdRoot = repoRoot(payload.cwd);
-  if (cwdRoot) roots.add(cwdRoot);
-  state.repos = {};
-  for (const root of roots) trackRepo(state, root, now);
+  trackRepo(state, repoRoot(payload.cwd), now);
   return null;
 }
 
@@ -426,7 +425,8 @@ export function onPreToolUse(payload, state, now) {
 }
 
 export function isPullRequestCommand(payload) {
-  return payload?.tool_name === 'Bash' && PR_COMMAND.test(String(payload.tool_input?.command ?? ''));
+  if (payload?.tool_name !== 'Bash') return false;
+  return commandSegments(String(payload.tool_input?.command ?? '')).some((segment) => PR_COMMAND.test(segment));
 }
 
 function pullRequestDecision(state, now) {
@@ -435,7 +435,7 @@ function pullRequestDecision(state, now) {
   if (state.pending.length > 0) {
     return { deny: '[review-gate] Revisão independente ainda rodando. Espere o resultado, trate os achados e só então abra o PR.' };
   }
-  const { files, unverifiable } = pendingChanges(state, now);
+  const { files, unverifiable } = pullRequestChanges(state, now);
   const warning = unverifiable.length > 0 ? `[review-gate] Não consegui verificar ${unverifiable.map(displayPath).join(', ')} (git lento ou indisponível); essas mudanças NÃO foram checadas pelo gate.` : null;
   const changedLines = files.reduce((sum, file) => sum + file.lines, 0);
   if (changedLines < MIN_CHANGED_LINES()) return warning ? { message: warning } : null;
@@ -458,7 +458,6 @@ export function onSubagentStop(payload, state, now) {
   for (const [root, tree] of Object.entries(launch.trees)) {
     if (state.repos[root]) state.repos[root].reviewed = tree;
   }
-  state.rounds += 1;
   return null;
 }
 
@@ -554,7 +553,6 @@ export function normalizeState(raw) {
   if (!isPlainObject(raw)) return state;
   if (isPlainObject(raw.repos)) state.repos = raw.repos;
   if (Array.isArray(raw.pending)) state.pending = raw.pending.filter((launch) => isPlainObject(launch) && isPlainObject(launch.trees) && typeof launch.launchedAt === 'number');
-  if (Number.isInteger(raw.rounds)) state.rounds = raw.rounds;
   if (typeof raw.skip === 'boolean') state.skip = raw.skip;
   if (isPlainObject(raw.unavailable)) state.unavailable = raw.unavailable;
   if (isPlainObject(raw.failedThisTurn)) state.failedThisTurn = raw.failedThisTurn;

@@ -245,9 +245,6 @@ statusline
     listStatusline();
   });
 
-// ============================================================
-// rules
-// ============================================================
 const rules = program
   .command('rules')
   .description('Gerencia as regras globais em ~/.claude/rules (carregadas em toda sessao)');

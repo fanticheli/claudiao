@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { attributionViolation } from '../claudiao-no-attribution.mjs';
+import { isPullRequestCommand } from '../claudiao-review-gate.mjs';
 
 const HOOKS_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SLASHES = '/'.repeat(2);
@@ -122,6 +123,30 @@ describe('no-attribution: the publishing command must be in command position', (
     attributionViolation(bash(`git ${flags}status`));
     assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 200);
   });
+});
+
+describe('review gate: the PR command is recognized through wrappers and aliases', () => {
+  const pr = (command) => isPullRequestCommand({ tool_name: 'Bash', tool_input: { command } });
+
+  const recognized = [
+    'gh pr create --fill',
+    'bash -c "gh pr create --title t"',
+    'eval "gh pr create"',
+    '/usr/bin/gh pr create',
+    'gh api -X POST /repos/o/r/pulls -f title=x',
+    'glab mr create --fill',
+    'hub pull-request -m "feat: x"',
+    'cd repo && gh pr create --fill',
+    'timeout 60 gh pr create --fill',
+  ];
+  for (const command of recognized) {
+    test(`recognizes ${command.slice(0, 34)}`, () => assert.equal(pr(command), true));
+  }
+
+  const ignored = ['gh pr list', 'gh pr view 12 --json body', 'git push origin HEAD', 'echo "gh pr create"'];
+  for (const command of ignored) {
+    test(`ignores ${command.slice(0, 34)}`, () => assert.equal(pr(command), false));
+  }
 });
 
 writeFileSync(join(workDir, '.keep'), '');

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 const C_STYLE = new Set([
   'ts', 'tsx', 'mts', 'cts', 'js', 'jsx', 'mjs', 'cjs',
@@ -129,36 +130,48 @@ function offenders(toolName, input, style) {
   return offendingLines(input.content ?? input.new_string, '', style);
 }
 
-const payload = readPayload();
-const input = payload?.tool_input;
-const filePath = input?.file_path;
-if (typeof filePath !== 'string' || !filePath) process.exit(0);
+function main() {
+  const payload = readPayload();
+  const input = payload?.tool_input;
+  const filePath = input?.file_path;
+  if (typeof filePath !== 'string' || !filePath) return;
 
-const style = styleFor(filePath);
-if (!style) process.exit(0);
+  const style = styleFor(filePath);
+  if (!style) return;
 
-const detected = offenders(payload.tool_name ?? '', input, style);
-if (detected.length === 0) process.exit(0);
+  const detected = offenders(payload.tool_name ?? '', input, style);
+  if (detected.length === 0) return;
 
-const sample = detected
-  .slice(0, 5)
-  .map((line) => {
-    const trimmed = line.trim();
-    return `  ${trimmed.length > 100 ? `${trimmed.slice(0, 97)}...` : trimmed}`;
-  })
-  .join('\n');
+  const sample = detected
+    .slice(0, 5)
+    .map((line) => {
+      const trimmed = line.trim();
+      return `  ${trimmed.length > 100 ? `${trimmed.slice(0, 97)}...` : trimmed}`;
+    })
+    .join('\n');
 
-const reason = [
-  `[standards] BLOQUEADO: a edição adiciona comentário em ${filePath}.`,
-  'Regra global (~/.claude/rules/code-standards.md): ZERO comentários no código, em qualquer projeto, mesmo que o CLAUDE.md do repo permita.',
-  'Reescreva sem comentários: nomes descritivos, funções pequenas. O contexto vai no corpo do PR ou na doc.',
-  `Linhas detectadas:\n${sample}`,
-].join('\n');
+  const reason = [
+    `[standards] BLOQUEADO: a edição adiciona comentário em ${filePath}.`,
+    'Regra global (~/.claude/rules/code-standards.md): ZERO comentários no código, em qualquer projeto, mesmo que o CLAUDE.md do repo permita.',
+    'Reescreva sem comentários: nomes descritivos, funções pequenas. O contexto vai no corpo do PR ou na doc.',
+    `Linhas detectadas:\n${sample}`,
+  ].join('\n');
 
-process.stdout.write(JSON.stringify({
-  hookSpecificOutput: {
-    hookEventName: 'PreToolUse',
-    permissionDecision: 'deny',
-    permissionDecisionReason: reason,
-  },
-}));
+  process.stdout.write(JSON.stringify({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: reason,
+    },
+  }));
+}
+
+function invokedDirectly() {
+  try {
+    return fileURLToPath(import.meta.url) === realpathSync(process.argv[1]);
+  } catch {
+    return false;
+  }
+}
+
+if (invokedDirectly()) main();

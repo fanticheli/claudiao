@@ -55,7 +55,7 @@ describe('round 4 finding 1: branch changes do not erase unreviewed edits', () =
     assert.ok(d.openPr()?.deny);
   });
 
-  test('checking out an existing branch with a clean tree does not blame the turn', () => {
+  test('checking out a branch that is ahead of the base branch still needs review', () => {
     const repo = createRepo();
     gitIn(repo, 'checkout', '-qb', 'other');
     writeFileSync(join(repo, 'src', 'other.ts'), code(100));
@@ -65,7 +65,7 @@ describe('round 4 finding 1: branch changes do not erase unreviewed edits', () =
     const d = driver(repo);
     d.prompt();
     gitIn(repo, 'checkout', '-q', 'other');
-    assert.equal(d.openPr(), null);
+    assert.ok(d.openPr()?.deny);
   });
 
   test('switching branches and then editing counts the new edits', () => {

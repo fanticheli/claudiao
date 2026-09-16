@@ -12,7 +12,7 @@ export function installRulesCommand(options?: { force?: boolean; dryRun?: boolea
     return;
   }
 
-  const pending = rules.filter((rule) => rule.state === 'missing' || (options?.force && rule.state === 'different'));
+  const pending = rules.filter((rule) => rule.state === 'missing' || options?.force);
   if (options?.dryRun) {
     for (const rule of pending) info(`[dry-run] ${rule.name} seria escrito em ${rule.destination}`);
     if (pending.length === 0) info('[dry-run] Nada a fazer');
