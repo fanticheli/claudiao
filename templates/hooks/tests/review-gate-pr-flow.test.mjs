@@ -69,6 +69,18 @@ describe('a PR whose work was done in an earlier session', () => {
     assert.match(s.launchReviewer('revise tiny.ts').deny, /precisa citar os arquivos alterados/);
   });
 
+  test('a review does not shrink the scope to what changed after it', () => {
+    const repo = repoWithCommittedBranch();
+    const s = session(repo);
+    s.prompt('abre o PR');
+    s.launchReviewer('revise big.ts');
+    s.reviewerStop();
+    writeFileSync(join(repo, 'src', 'extra.ts'), code(40, 'extra'));
+    const denied = s.openPr().deny;
+    assert.match(denied, /big\.ts/);
+    assert.match(denied, /extra\.ts/);
+  });
+
   test('code added after the review needs a new review', () => {
     const repo = repoWithCommittedBranch();
     const s = session(repo);

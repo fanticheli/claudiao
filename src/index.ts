@@ -11,6 +11,7 @@ import { installPlugin } from './commands/install-plugin.js';
 import { installHooks, uninstallHooks, listHooks } from './commands/hooks.js';
 import { installStatusline, uninstallStatusline, listStatusline } from './commands/statusline.js';
 import { installRulesCommand, listRulesCommand } from './commands/rules.js';
+import { enableItem, listDisabled } from './commands/enable.js';
 import { attributionOff, attributionOn, attributionStatus } from './commands/attribution.js';
 import { getPackageVersion } from './lib/package-info.js';
 import { MalformedSettingsError } from './lib/hooks.js';
@@ -243,6 +244,27 @@ statusline
   .description('Mostra a statusLine ativa e se foi instalada pelo claudiao')
   .action(() => {
     listStatusline();
+  });
+
+const enableCommand = program
+  .command('enable')
+  .description('Reativa agente, skill ou command desativado e volta a link-lo');
+
+for (const [type, label] of [['agent', 'agente'], ['skill', 'skill'], ['command', 'slash command']] as const) {
+  enableCommand
+    .command(`${type} <name>`)
+    .description(`Reativa um ${label} que foi removido`)
+    .option('--dry-run', 'Mostra o que seria feito sem executar')
+    .action((name: string, options: { dryRun?: boolean }) => {
+      enableItem(type, name, options);
+    });
+}
+
+enableCommand
+  .command('list')
+  .description('Lista o que esta desativado')
+  .action(() => {
+    listDisabled();
   });
 
 const rules = program
