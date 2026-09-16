@@ -68,6 +68,17 @@ describe('disabled list in .claudiao.json', () => {
     expect(JSON.parse(readFileSync(CONFIG_OVERRIDE, 'utf-8')).disabled.agents).toEqual(['x']);
   });
 
+  it('does not corrupt a hand-written list that is not an array', async () => {
+    writeFileSync(CONFIG_OVERRIDE, JSON.stringify({ disabled: { agents: 'gcp-specialist' } }));
+    const { disable } = await importDisabled();
+    expect(disable('agents', 'azure-specialist')).toBe(true);
+    expect(JSON.parse(readFileSync(CONFIG_OVERRIDE, 'utf-8')).disabled.agents).toEqual(['azure-specialist']);
+
+    writeFileSync(CONFIG_OVERRIDE, JSON.stringify({ disabled: { agents: 42 } }));
+    const fresh = await importDisabled();
+    expect(() => fresh.disable('agents', 'azure-specialist')).not.toThrow();
+  });
+
   it('ignores non-string entries written by hand', async () => {
     writeFileSync(CONFIG_OVERRIDE, JSON.stringify({ disabled: { agents: ['ok', 42, null] } }));
     const { disabledNames } = await importDisabled();

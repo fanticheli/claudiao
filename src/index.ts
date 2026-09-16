@@ -252,11 +252,11 @@ const enableCommand = program
 
 for (const [type, label] of [['agent', 'agente'], ['skill', 'skill'], ['command', 'slash command']] as const) {
   enableCommand
-    .command(`${type} <nome>`)
+    .command(`${type} <name>`)
     .description(`Reativa um ${label} que foi removido`)
     .option('--dry-run', 'Mostra o que seria feito sem executar')
-    .action((nome: string, options: { dryRun?: boolean }) => {
-      enableItem(type, nome, options);
+    .action((name: string, options: { dryRun?: boolean }) => {
+      enableItem(type, name, options);
     });
 }
 
