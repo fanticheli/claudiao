@@ -7,6 +7,36 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Adicionado
+
+- **Skill `session-insights`**: minera o histórico de sessões (extração local, sem tokens), agrupa os erros recorrentes do Claude e propõe contramedidas, com aprovação obrigatória antes de implementar. Inclui `extract-episodes.py`, que mascara credenciais antes de truncar, e 14 testes.
+- **5 hooks de enforcement** (`english-code`, `commit-message`, `credentials`, `no-attribution`, `review-gate`), com 426 testes em `templates/hooks/tests` rodando via `node --test` no `npm test` e no CI.
+- **`claudiao rules install`** e `claudiao rules list`: instalam em `~/.claude/rules/` as regras globais que os hooks cobram. Regra editada localmente nunca é sobrescrita sem `--force`.
+- **Agente `independent-reviewer`** bundled, usado pelo `review-gate`. Além de caçar bug, ele responde se o PR entrega o que foi pedido, se segue o padrão do projeto e se tem gambiarra, over engineering ou escopo inventado.
+- `HookCategory.extraEvents`: uma categoria pode registrar o mesmo script em vários eventos. O `matcher` vale só nos eventos que o suportam.
+- `HookCategory.extraFiles`: arquivos importados pelo hook (`lib/portuguese.mjs`, `lib/shell.mjs`) são copiados junto com o script.
+- Eventos `SubagentStop` e `UserPromptSubmit` no tipo `HookEvent`.
+
+### Alterado
+
+- O `review-gate` passou a bloquear **na abertura do PR** (`gh pr create`, `glab mr create`, `hub pull-request`, `gh api .../pulls`, inclusive atrás de `bash -c`, `eval`, `timeout` e caminho absoluto), em vez de bloquear o fim de cada turno.
+- A base de comparação do gate passou a ser o **merge-base com a branch base** (`origin/HEAD`, `main`, `master`), e não mais a árvore do início do turno: o que conta é o que vai no PR, mesmo feito em turnos ou sessões anteriores. Com isso saíram a heurística de reflog/checkout, o contador de rodadas e o rebaseline a cada mensagem.
+- `claudiao hooks list` agrupa por categoria em vez de repetir o mesmo script uma vez por evento.
+- `templates/hooks/tests` não é mais publicado no npm.
+
+### Corrigido
+
+- `claudiao-no-attribution` não instalava `claudiao-credentials.mjs`, do qual dependia: instalar só essa categoria gerava um hook que quebrava em toda chamada. A função compartilhada virou `lib/shell.mjs`, declarada em `extraFiles`, e um teste garante que todo `import` relativo de hook está declarado.
+- `claudiao-no-attribution` deixava passar atribuição atrás de wrapper (`bash -c`, `sh -c`, parênteses, `nohup`, `timeout`, `command`, `xargs`).
+- `claudiao-no-comments` desligava a detecção do arquivo inteiro quando havia uma crase solta dentro de string: o filtro passou a usar posição de linha, e o scanner reconhece aspas simples e duplas.
+- `claudiao-no-comments` acusava comentário em texto dentro de string multilinha (docstring com título markdown, template literal com barras), e agora expõe suas funções sem executar o CLI ao ser importado.
+- `claudiao-commit-message` bloqueava qualquer comando que apenas mencionasse `git commit` dentro de uma string (`sed`, `echo` de JSON). Passou a usar `lib/shell.mjs` e só considera segmento que começa com `git ... commit`.
+- `claudiao-no-attribution` bloqueava documentação que citava um commit e os termos de atribuição na mesma linha. O regex do `git` também deixou de ter backtracking exponencial.
+- Hosts de banco, usuários de Vault e dados pessoais saíram das fixtures e das mensagens dos hooks.
+- `npm test` rodava também os testes compilados em `dist/`, desatualizados e falhando. Agora roda `vitest run src` mais os testes dos hooks.
+- O CI não executava a suíte de testes: rodava só typecheck, build e `--help`.
+- Teste instável em `install-plugin.deprecation.test.ts`: `vi.doMock` dependia da ordem de carga dos módulos e falhava em cerca de 1 de cada 5 execuções.
+
 ## [1.7.0] — 2026-07-23
 
 Dois reforços de fluxo: um hook que bloqueia comentários em código e a desativação da atribuição do Claude Code em commits e PRs.

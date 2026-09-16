@@ -221,7 +221,9 @@ Hooks são injetados pelo Claude Code em momentos-chave. A maioria são lembrete
 A partir da v1.2.0 os scripts são Node.js (`.mjs`) e funcionam em Linux, macOS e Windows nativo sem dependências externas.
 
 ```bash
-claudiao hooks install                         # seleção interativa dos 6 hooks bundled
+claudiao hooks install                         # seleção interativa dos 11 hooks bundled
+claudiao rules install                         # instala as regras globais em ~/.claude/rules
+claudiao rules list                            # mostra quais regras estão instaladas
 claudiao hooks install --only security,pr      # instala apenas os categorias informadas
 claudiao hooks list                            # mostra hooks ativos
 claudiao hooks uninstall                       # remove apenas os hooks do claudião, preserva outros
@@ -267,12 +269,17 @@ Escreve em `~/.claude/settings.json` via merge atômico (preserva o resto da con
 | `ui` | `PreToolUse` | `Write\|Edit` em `.tsx/.jsx/.vue/.svelte` ou `components/pages/views` | `/ui-review-checklist` antes de abrir PR |
 | `no-comments` | `PreToolUse` (bloqueia) | `Write\|Edit` em código (`.ts/.js/.py/.go/.rs/...`) | **Nega** a edição se adicionar comentários no código |
 | `migration` | `PreToolUse` | `Write\|Edit` em `migrations/`, `*.sql`, `alembic/versions`, `prisma/migrations` | Patterns zero-downtime de `/sql-templates` |
-| `commit` | `PreToolUse` | `Bash` com `git commit -m "..."` | Valida formato conventional commits |
+| `commit` | `PreToolUse` | `Bash` com `git commit -m "..."` | Lembrete (não bloqueia) do formato conventional commits. Se você instalar o `commit-message`, que bloqueia, não precisa deste |
 | `pr` | `Stop` | (sem matcher) | `/pr-template` + `/security-checklist` no fim de sessão com edits — fecha o loop do fluxo |
+| `english-code` | `PreToolUse` (bloqueia) | `Write\|Edit` criando arquivo novo de código | **Nega** arquivo novo com nome ou identificadores em português (edição de arquivo existente passa) |
+| `commit-message` | `PreToolUse` (bloqueia) | `Bash` com `git` + `commit` | **Nega** mensagem fora de `type(scope): description`, escrita em português ou com atribuição de IA |
+| `credentials` | `PreToolUse` (bloqueia) + `UserPromptSubmit` | `Bash` | **Nega** credencial inline (`PGPASSWORD=`, `--password`, header `Authorization`, `user:senha@host`, `-u user:senha`); quando o segredo vem no prompt, avisa o Claude para não reusar |
+| `no-attribution` | `PreToolUse` (bloqueia) | `Bash` e MCPs de Atlassian/Slack/Gmail | **Nega** trailer de IA em commit, PR, issue, card ou mensagem — inclusive quando o texto vem de arquivo (`--body-file`, `-F`, `< arquivo`, `$(cat ...)`) ou atrás de wrapper (`bash -c`, `xargs`, `timeout`) |
+| `review-gate` | `PreToolUse` (bloqueia) + `SubagentStop` + `UserPromptSubmit` | `Edit\|Write\|MultiEdit\|NotebookEdit\|Bash\|Agent\|Task` | Bloqueia `gh pr create`, `glab mr create` e equivalentes enquanto o diff contra a branch base tiver mais de 60 linhas sem revisão do agente `independent-reviewer`. O usuário libera terminando a mensagem com `sem review` |
 
 **Por que o Stop hook existe:** a validação de 18/04/2026 mostrou que os hooks `PreToolUse` cobrem bem a fase de edição, mas o fechamento (rodar `/pr-template` e `/security-checklist` completo antes do PR) continuava sendo esquecido. O hook `pr` detecta sessões que tiveram edits (via `tool_use_count`, `has_edits` ou parsing do `transcript_path`) e injeta o lembrete; sessões só-leitura passam em silêncio.
 
-## Agentes incluídos (18)
+## Agentes incluídos (19)
 
 | Categoria | Agente | O que faz |
 |-----------|--------|-----------|
@@ -285,6 +292,7 @@ Escreve em `~/.claude/settings.json` via merge atômico (preserva o resto da con
 | | `azure-specialist` | App Service, AKS, Functions, Bicep |
 | | `gcp-specialist` | Cloud Run, GKE, BigQuery, Terraform GCP |
 | **Qualidade** | `pr-reviewer` | Code review com severidade (blocker/importante/sugestão) |
+| **Qualidade** | `independent-reviewer` | Revisor cético somente leitura usado pelo hook `review-gate`: lê o diff real, roda testes/typecheck e tenta provar que a implementação está errada |
 | | `test-specialist` | Estratégia de testes, TDD, cobertura, mocks |
 | | `security-specialist` | OWASP Top 10, SAST, secrets, auth, hardening |
 | **Planejamento** | `architect` | Trade-offs, ADRs, diagramas, design de sistemas |

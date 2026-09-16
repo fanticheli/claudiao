@@ -11,7 +11,9 @@
     "dev": "tsx src/index.ts",
     "prepublishOnly": "npm run build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run src && npm run test:hooks && npm run test:skill",
+    "test:hooks": "node --test templates/hooks/tests/*.test.mjs",
+    "test:skill": "python3 templates/skills/session-insights/scripts/test-extract-episodes.py"
   },
   "keywords": [
     "claude",
@@ -30,6 +32,8 @@
   "files": [
     "dist",
     "templates",
+    "!templates/hooks/tests",
+    "!templates/**/__pycache__",
     "README.md",
     "CHANGELOG.md",
     "BACKLOG.md"
