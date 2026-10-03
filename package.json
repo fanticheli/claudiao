@@ -7,6 +7,7 @@
     "claudiao": "dist/index.js"
   },
   "scripts": {
+    "prebuild": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsx src/index.ts",
     "prepublishOnly": "npm run build",
@@ -26,6 +27,14 @@
   ],
   "author": "Igor Fanticheli",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fanticheli/claudiao.git"
+  },
+  "homepage": "https://github.com/fanticheli/claudiao#readme",
+  "bugs": {
+    "url": "https://github.com/fanticheli/claudiao/issues"
+  },
   "engines": {
     "node": ">=18.0.0"
   },
@@ -35,8 +44,7 @@
     "!templates/hooks/tests",
     "!templates/**/__pycache__",
     "README.md",
-    "CHANGELOG.md",
-    "BACKLOG.md"
+    "CHANGELOG.md"
   ],
   "dependencies": {
     "@sindresorhus/slugify": "^3.0.0",
