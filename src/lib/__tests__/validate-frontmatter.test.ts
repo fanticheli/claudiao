@@ -157,7 +157,7 @@ describe('validateAgentFrontmatter', () => {
     expect(result.issues.some((i) => i.field === 'tools' && i.severity === 'error')).toBe(true);
   });
 
-  it('warns when model is missing', () => {
+  it('accepts an agent without the optional tools and model fields', () => {
     const dir = makeTmp();
     const file = writeAgent(
       dir,
@@ -165,12 +165,11 @@ describe('validateAgentFrontmatter', () => {
       [
         'name: nomodel',
         'description: descrição boa com gatilho use when, suficientemente longa pra passar no minimo de chars',
-        'tools: Read',
       ].join('\n'),
     );
 
     const result = validateAgentFrontmatter(file);
-    expect(result.issues.some((i) => i.field === 'model' && i.severity === 'warn')).toBe(true);
+    expect(result.issues).toEqual([]);
   });
 });
 
@@ -208,7 +207,7 @@ describe('validateSkillFrontmatter', () => {
     expect(hasErrors(result)).toBe(true);
   });
 
-  it('warns when allowed-tools is missing', () => {
+  it('accepts a skill without the optional allowed-tools and model fields', () => {
     const dir = makeTmp();
     const file = writeAgent(
       dir,
@@ -216,14 +215,11 @@ describe('validateSkillFrontmatter', () => {
       [
         'name: skill',
         'description: desc longa o suficiente pra passar no mínimo sem problemas nenhum agora',
-        'model: sonnet',
       ].join('\n'),
     );
 
     const result = validateSkillFrontmatter(file);
-    expect(
-      result.issues.some((i) => i.field === 'allowed-tools' && i.severity === 'warn'),
-    ).toBe(true);
+    expect(result.issues).toEqual([]);
   });
 });
 

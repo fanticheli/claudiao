@@ -65,16 +65,10 @@ export function validateAgentFrontmatter(filePath: string): ValidationResult {
     }
   }
 
-  if (!data.tools) {
-    issues.push({ field: 'tools', severity: 'warn', message: 'campo `tools` ausente (default: todas)' });
-  } else if (typeof data.tools !== 'string' && !isStringArray(data.tools)) {
+  if (data.tools && typeof data.tools !== 'string' && !isStringArray(data.tools)) {
     // Claude Code aceita tanto string CSV ("Read, Write") quanto array YAML
     // (- Read\n  - Write). Rejeitamos apenas formatos que não sejam nenhum dos dois.
     issues.push({ field: 'tools', severity: 'error', message: 'campo `tools` deve ser string CSV ou array de strings' });
-  }
-
-  if (!data.model) {
-    issues.push({ field: 'model', severity: 'warn', message: 'campo `model` ausente (default: opus)' });
   }
 
   return { file: filePath, name, issues };
@@ -101,18 +95,6 @@ export function validateSkillFrontmatter(filePath: string): ValidationResult {
       severity: 'warn',
       message: `description muito curta (${data.description.length} chars, mínimo ${MIN_DESCRIPTION_LENGTH})`,
     });
-  }
-
-  if (!data['allowed-tools']) {
-    issues.push({
-      field: 'allowed-tools',
-      severity: 'warn',
-      message: 'campo `allowed-tools` ausente (default: todas)',
-    });
-  }
-
-  if (!data.model) {
-    issues.push({ field: 'model', severity: 'warn', message: 'campo `model` ausente (default: sonnet)' });
   }
 
   return { file: filePath, name, issues };
