@@ -13,15 +13,29 @@ const bundledCounts = {
 };
 
 const readmePatterns = {
-  agents: /(\d+) agent(?:e)?s\b/g,
-  skills: /(\d+) skills\b/g,
+  agents: /(?:(\d+) agent(?:e)?s\b|Agentes incluídos \((\d+)\))/g,
+  skills: /(?:(\d+) skills\b|Skills incluídas \((\d+)\))/g,
   hooks: /(\d+) hooks\b/g,
 };
+
+const bundledNames = {
+  agents: readdirSync(join(templates, 'agents')).filter((file) => file.endsWith('.md')).map((file) => file.replace(/\.md$/, '')),
+  skills: readdirSync(join(templates, 'skills'), { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name),
+  commands: readdirSync(join(templates, 'commands')).filter((file) => file.endsWith('.md')).map((file) => file.replace(/\.md$/, '')),
+};
+
+describe('README lists every bundled template', () => {
+  for (const [kind, names] of Object.entries(bundledNames)) {
+    it(`mentions every bundled ${kind}`, () => {
+      expect(names.filter((name) => !readme.includes(`\`${kind === 'agents' ? name : `/${name}`}\``))).toEqual([]);
+    });
+  }
+});
 
 describe('README counts', () => {
   for (const [kind, pattern] of Object.entries(readmePatterns)) {
     it(`every ${kind} count matches the bundled templates`, () => {
-      const counts = [...readme.matchAll(pattern)].map((match) => Number(match[1]));
+      const counts = [...readme.matchAll(pattern)].map((match) => Number(match[1] ?? match[2]));
       expect(counts.length).toBeGreaterThan(0);
       expect(new Set(counts)).toEqual(new Set([bundledCounts[kind as keyof typeof bundledCounts]]));
     });

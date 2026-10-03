@@ -213,7 +213,7 @@ O que você remove fica registrado em `~/.claude/.claudiao.json`, e `init`/`upda
 
 ### Slash commands (v1.6.0+)
 
-Slash commands são arquivos `.md` standalone em `~/.claude/commands/` — diferentes de skills (que vivem em diretório com `SKILL.md`). O claudião gerencia ambos da mesma forma: symlinks com cascata `repo externo > bundled`. Como o pacote não traz commands bundled, a fonte típica é o diretório `commands/` do seu [repo externo](#repo-externo-avançado). O `init`, `update`, `doctor` e `list`/`remove` cobrem commands automaticamente.
+Slash commands são arquivos `.md` standalone em `~/.claude/commands/` — diferentes de skills (que vivem em diretório com `SKILL.md`). O claudião gerencia ambos da mesma forma: symlinks com cascata `repo externo > bundled`. O pacote traz 4 commands do fluxo Jira + Slack (`/bug`, `/bug-close`, `/eod`, `/plan`); você pode adicionar os seus no diretório `commands/` do seu [repo externo](#repo-externo-avançado). O `init`, `update`, `doctor` e `list`/`remove` cobrem commands automaticamente.
 
 ### Hooks (lembretes de skill)
 
@@ -280,11 +280,11 @@ Escreve em `~/.claude/settings.json` via merge atômico (preserva o resto da con
 | `commit-message` | `PreToolUse` (bloqueia) | `Bash` com `git` + `commit` | **Nega** mensagem fora de `type(scope): description`, escrita em português ou com atribuição de IA |
 | `credentials` | `PreToolUse` (bloqueia) + `UserPromptSubmit` | `Bash` | **Nega** credencial inline (`PGPASSWORD=`, `--password`, header `Authorization`, `user:senha@host`, `-u user:senha`); quando o segredo vem no prompt, avisa o Claude para não reusar |
 | `no-attribution` | `PreToolUse` (bloqueia) | `Bash` e MCPs de Atlassian/Slack/Gmail | **Nega** trailer de IA em commit, PR, issue, card ou mensagem — inclusive quando o texto vem de arquivo (`--body-file`, `-F`, `< arquivo`, `$(cat ...)`) ou atrás de wrapper (`bash -c`, `xargs`, `timeout`) |
-| `review-gate` | `PreToolUse` (bloqueia) + `SubagentStop` + `UserPromptSubmit` | `Edit\|Write\|MultiEdit\|NotebookEdit\|Bash\|Agent\|Task` | Bloqueia `gh pr create`, `glab mr create` e equivalentes enquanto o diff contra a branch base tiver mais de 60 linhas sem revisão do agente `independent-reviewer`. O usuário libera terminando a mensagem com `sem review` |
+| `review-gate` | `PreToolUse` (bloqueia) + `SubagentStop` + `UserPromptSubmit` | `Edit\|Write\|MultiEdit\|NotebookEdit\|Bash\|Agent\|Task` | Bloqueia `gh pr create`, `glab mr create` e equivalentes enquanto o diff contra a branch base tiver mais de 60 linhas sem revisão do agente `independent-reviewer`. Depois de uma revisão, conta só o que mudou desde ela: correção pequena passa direto, correção grande pede uma revisão incremental do diff, não do PR inteiro. O usuário libera terminando a mensagem com `sem review` |
 
 **Por que o Stop hook existe:** a validação de 18/04/2026 mostrou que os hooks `PreToolUse` cobrem bem a fase de edição, mas o fechamento (rodar `/pr-template` e `/security-checklist` completo antes do PR) continuava sendo esquecido. O hook `pr` detecta sessões que tiveram edits (via `tool_use_count`, `has_edits` ou parsing do `transcript_path`) e injeta o lembrete; sessões só-leitura passam em silêncio.
 
-## Agentes incluídos (19)
+## Agentes incluídos (20)
 
 | Categoria | Agente | O que faz |
 |-----------|--------|-----------|
@@ -297,7 +297,7 @@ Escreve em `~/.claude/settings.json` via merge atômico (preserva o resto da con
 | | `azure-specialist` | App Service, AKS, Functions, Bicep |
 | | `gcp-specialist` | Cloud Run, GKE, BigQuery, Terraform GCP |
 | **Qualidade** | `pr-reviewer` | Code review com severidade (blocker/importante/sugestão) |
-| **Qualidade** | `independent-reviewer` | Revisor cético somente leitura usado pelo hook `review-gate`: lê o diff real, roda testes/typecheck e tenta provar que a implementação está errada |
+| **Qualidade** | `independent-reviewer` | Revisor cético somente leitura usado pelo hook `review-gate`: lê o diff real, roda testes/typecheck e tenta provar que a implementação está errada. Roda em Sonnet; o gate pede Opus para PR acima de 400 linhas |
 | | `test-specialist` | Estratégia de testes, TDD, cobertura, mocks |
 | | `security-specialist` | OWASP Top 10, SAST, secrets, auth, hardening |
 | **Planejamento** | `architect` | Trade-offs, ADRs, diagramas, design de sistemas |
@@ -307,18 +307,21 @@ Escreve em `~/.claude/settings.json` via merge atômico (preserva o resto da con
 | | `product-owner` | Priorização, user stories, métricas de produto |
 | | `prompt-engineer` | Criar e otimizar prompts para LLMs |
 | | `dod-specialist` | Definition of Done mensurável e progressiva |
+| **Fluxo Jira + Slack** | `daily-reporter` | Monta card, comentário ou mensagem, mostra preview e só publica após aprovação |
 
-## Skills incluídas (9)
+## Skills incluídas (11)
 
 | Comando | O que faz |
 |---------|-----------|
 | `/architecture-decision` | Template de ADR com contexto, opções, trade-offs e decisão |
+| `/fanti-flow-config` | Config central do fluxo Jira + Slack: project keys, canais e templates (edite com os dados do seu workspace) |
 | `/meet-dod` | Transforma resumo de reunião (Meet/Zoom) em Definition of Done estruturada |
 | `/pm-templates` | Templates de User Story, Sprint Planning, Retrospectiva e ADR |
 | `/pr-template` | Template padronizado de PR com checklist de review e labels |
 | `/product-templates` | PRD, RICE scoring, product brief e go-to-market |
 | `/python-patterns` | Boilerplates Python: Repository Pattern, Settings, FastAPI, pytest |
 | `/security-checklist` | Checklist pré-deploy com OWASP Top 10, headers, secrets, dependências |
+| `/session-insights` | Minera o histórico de sessões, acha os erros que o Claude repete com você e propõe contramedidas |
 | `/sql-templates` | Templates SQL para diagnóstico de performance, migrations zero-downtime e indexes |
 | `/ui-review-checklist` | 30+ items de revisão de UI: hierarquia visual, acessibilidade, responsividade |
 
