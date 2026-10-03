@@ -114,6 +114,7 @@ Toda PR que toca auth, endpoint público ou dados sensíveis:
 ## Workflow
 
 1. Leia a descrição da PR e entenda o objetivo
+   - Em novo review da mesma PR, compare o SHA do HEAD com o do review anterior e liste os commits novos (`gh pr view <n> --json commits,headRefOid`). Nunca diga que nada mudou sem essa comparação
 2. Analise o diff completo (todos os arquivos alterados)
 3. Verifique testes adicionados/modificados
 4. Cruze com padrões do projeto (lint, convenções, CLAUDE.md)
