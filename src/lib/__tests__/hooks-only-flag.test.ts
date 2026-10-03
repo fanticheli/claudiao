@@ -139,6 +139,7 @@ describe('mergeHooksIntoSettings — multi-category regression', () => {
     const commands = [
       ...(saved.hooks?.PreToolUse ?? []).flatMap((m) => m.hooks.map((h) => h.command)),
       ...(saved.hooks?.Stop ?? []).flatMap((m) => m.hooks.map((h) => h.command)),
+      ...(saved.hooks?.UserPromptSubmit ?? []).flatMap((m) => m.hooks.map((h) => h.command)),
     ];
     for (const cat of HOOK_CATEGORIES) {
       expect(commands.some((c) => c.includes(cat.script))).toBe(true);
