@@ -9,6 +9,11 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Alterado
+
+- `claudiao-review-gate`: depois de uma revisão, o gate conta só o que mudou desde ela. Correção pequena (abaixo do limite de linhas) não pede nova revisão; correção grande pede uma **revisão incremental** do diff desde a última revisão, em vez de revisar o PR inteiro de novo. Quem já instalou precisa rodar `claudiao hooks install` de novo.
+- Agente `independent-reviewer` passa a rodar em Sonnet e ganha o modo de revisão incremental. O gate pede `model: "opus"` para PR acima de 400 linhas.
+
 ### Adicionado
 
 - **Lista de desativados em `~/.claude/.claudiao.json`**: `init` e `update` deixam de recriar o link de agente, skill ou command que o usuário removeu. `claudiao remove` registra a remoção automaticamente, `claudiao enable <agent|skill|command> <nome>` reverte e `claudiao enable list` mostra o que está desativado.

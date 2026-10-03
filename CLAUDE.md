@@ -57,7 +57,9 @@ O hook lê o payload de `fd 0`, e sem o guard qualquer `import` das suas funçõ
 ### Review gate: bloqueia o PR, não o fim do turno
 `claudiao-review-gate.mjs` nega `gh pr create` e equivalentes enquanto o diff contra a branch base passar de 60 linhas sem revisão do agente `independent-reviewer`. Pontos que não são óbvios:
 - a base é o **merge-base** com `origin/HEAD`/`main`/`master`/`develop`/`trunk`, não a árvore do início da sessão: o que importa é o que vai no PR, mesmo feito em outra sessão;
-- a base **não** muda depois de uma revisão: ela continua no merge-base, para que o PR inteiro esteja coberto. Uma revisão só continua valendo enquanto nada revisável mudar depois dela;
+- a base **não** muda depois de uma revisão: ela continua no merge-base, para que o PR inteiro esteja coberto;
+- depois de uma revisão, só conta o que mudou desde a árvore revisada (restrito aos arquivos do PR). Abaixo de 60 linhas o PR passa; acima, o gate pede **revisão incremental** do diff desde a revisão, não uma revisão completa. É isso que evita o ciclo revisa → corrige → revisa tudo de novo;
+- o revisor roda em Sonnet; o gate pede `model: "opus"` quando o diff passa de 400 linhas;
 - o registro da revisão e o bloqueio usam a **mesma** base; se divergirem, o PR trava sem saída;
 - o gate julga só o repo onde o PR está sendo aberto;
 - o prompt do revisor precisa citar todos os arquivos alterados;

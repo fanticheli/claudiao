@@ -69,16 +69,51 @@ describe('a PR whose work was done in an earlier session', () => {
     assert.match(s.launchReviewer('revise tiny.ts').deny, /precisa citar os arquivos alterados/);
   });
 
-  test('a review does not shrink the scope to what changed after it', () => {
+  test('after a review only what changed since it is charged, as an incremental review', () => {
     const repo = repoWithCommittedBranch();
     const s = session(repo);
     s.prompt('abre o PR');
     s.launchReviewer('revise big.ts');
     s.reviewerStop();
+    const reviewedTree = s.state.repos[repo].reviewed;
     writeFileSync(join(repo, 'src', 'extra.ts'), code(40, 'extra'));
     const denied = s.openPr().deny;
-    assert.match(denied, /big\.ts/);
+    assert.match(denied, /REVISÃO INCREMENTAL/);
     assert.match(denied, /extra\.ts/);
+    assert.doesNotMatch(denied, /big\.ts/);
+    assert.ok(denied.includes(`git -C ${repo} diff ${reviewedTree}`));
+    assert.equal(s.launchReviewer('revisão incremental de extra.ts'), null);
+    s.reviewerStop();
+    assert.equal(s.openPr(), null);
+  });
+
+  test('a small fix after a review does not trigger another review', () => {
+    const repo = repoWithCommittedBranch();
+    const s = session(repo);
+    s.prompt('abre o PR');
+    s.launchReviewer('revise big.ts');
+    s.reviewerStop();
+    writeFileSync(join(repo, 'src', 'big.ts'), code(200, 'big').replace('big0 = 0', 'big0 = 1') + code(10, 'fix'));
+    assert.equal(s.openPr(), null);
+  });
+
+  test('small fixes accumulate against the reviewed tree', () => {
+    const repo = repoWithCommittedBranch();
+    const s = session(repo);
+    s.prompt('abre o PR');
+    s.launchReviewer('revise big.ts');
+    s.reviewerStop();
+    writeFileSync(join(repo, 'src', 'fix1.ts'), code(20, 'one'));
+    assert.equal(s.openPr(), null);
+    writeFileSync(join(repo, 'src', 'fix2.ts'), code(20, 'two'));
+    const denied = s.openPr().deny;
+    assert.match(denied, /fix1\.ts/);
+    assert.match(denied, /fix2\.ts/);
+  });
+
+  test('a large PR asks for the opus model, a regular one does not', () => {
+    assert.match(session(repoWithCommittedBranch(450)).openPr().deny, /model "opus"/);
+    assert.doesNotMatch(session(repoWithCommittedBranch(200)).openPr().deny, /model "opus"/);
   });
 
   test('code added after the review needs a new review', () => {
