@@ -15,6 +15,7 @@ const GIT_TIMEOUT_MS = 3000;
 const LOCK_WAIT_MS = 2500;
 const LOCK_STALE_MS = 15000;
 const MIN_CHANGED_LINES = () => Number(process.env.REVIEW_GATE_MIN_LINES) || 60;
+const OPUS_MIN_LINES = 400;
 const SKIP_DIRECTIVE = /(^|[\s(\[,.;:])(sem review|no-review|skip review)\s*[)\].!]*\s*$/i;
 const LEADING_CD = /^\s*cd\s+("[^"]+"|'[^']+'|[^\s;&|]+)\s*(?:&&|;)/;
 const ABSOLUTE_PATH_TOKEN = /(?:^|[\s='"(:])((?:~\/|\/)[^\s'";|&()<>`$]+)/g;
@@ -338,6 +339,7 @@ function reviewableChanges(state, now, roots = null) {
   const selected = roots ? roots.filter((root) => state.repos[root]) : Object.keys(state.repos);
   const files = [];
   const trees = {};
+  const reviewed = {};
   const unverifiable = Object.keys(state.unavailable).filter((root) => !state.repos[root]);
   for (const root of selected) {
     const repo = state.repos[root];
@@ -349,9 +351,17 @@ function reviewableChanges(state, now, roots = null) {
     }
     trees[root] = tree;
     if (repo.reviewed && changedFiles(root, repo.reviewed, tree).length === 0) continue;
-    files.push(...changedFiles(root, reviewBase(root, repo), tree));
+    const pullRequestFiles = changedFiles(root, reviewBase(root, repo), tree);
+    if (!repo.reviewed) {
+      files.push(...pullRequestFiles);
+      continue;
+    }
+    const pullRequestPaths = new Set(pullRequestFiles.map((file) => file.relativePath));
+    const sinceReview = changedFiles(root, repo.reviewed, tree).filter((file) => pullRequestPaths.has(file.relativePath));
+    if (sinceReview.length > 0) reviewed[root] = repo.reviewed;
+    files.push(...sinceReview);
   }
-  return { files, trees, unverifiable };
+  return { files, trees, unverifiable, reviewed };
 }
 
 export function bashRepoCandidates(command, cwd) {
@@ -435,12 +445,13 @@ function pullRequestDecision(payload, state, now) {
   if (state.pending.length > 0) {
     return { deny: '[review-gate] Revisão independente ainda rodando. Espere o resultado, trate os achados e só então abra o PR.' };
   }
-  const { files, unverifiable } = reviewableChanges(state, now, pullRequestRoots(payload, state, now));
+  const { files, unverifiable, reviewed } = reviewableChanges(state, now, pullRequestRoots(payload, state, now));
   const warning = unverifiable.length > 0 ? `[review-gate] Não consegui verificar ${unverifiable.map(displayPath).join(', ')} (git lento ou indisponível); essas mudanças NÃO foram checadas pelo gate.` : null;
   const changedLines = files.reduce((sum, file) => sum + file.lines, 0);
   if (changedLines < MIN_CHANGED_LINES()) return warning ? { message: warning } : null;
   const listed = [...new Set(files.map((file) => displayPath(file.path)))];
-  return { deny: [blockReason(listed, changedLines), warning].filter(Boolean).join('\n') };
+  const instructions = Object.keys(reviewed).length > 0 ? incrementalReviewReason(listed, changedLines, reviewed) : blockReason(listed, changedLines);
+  return { deny: [instructions, warning].filter(Boolean).join('\n') };
 }
 
 export function onSubagentStop(payload, state, now) {
@@ -461,13 +472,34 @@ export function onSubagentStop(payload, state, now) {
   return null;
 }
 
+function reviewerModel(changedLines) {
+  return changedLines >= OPUS_MIN_LINES ? ' com model "opus" (PR grande)' : '';
+}
+
+function incrementalReviewReason(files, changedLines, reviewed) {
+  const deltas = Object.entries(reviewed).map(([root, tree]) => `git -C ${root} diff ${tree}`).join('\n');
+  return [
+    `[review-gate] PR bloqueado: ${changedLines} linhas alteradas depois da última revisão independente.`,
+    `Arquivos alterados desde a revisão: ${files.join(', ')}`,
+    'Diff desde a revisão:',
+    deltas,
+    '',
+    'Antes de abrir o PR, obrigatoriamente:',
+    `1. Chame o Agent com subagent_type "${REVIEWER}"${reviewerModel(changedLines)} para uma REVISÃO INCREMENTAL. O prompt deve citar esses arquivos, o comando de diff acima, os achados blocker/major da revisão anterior e o que você fez com cada um.`,
+    '2. O revisor confere só se os achados anteriores foram resolvidos e se o diff desde a revisão introduz blocker/major. O restante do PR já foi revisado.',
+    '3. Não edite nada enquanto a revisão roda, senão ela é invalidada.',
+    '4. Para cada achado blocker/major: corrija, ou refute com prova concreta.',
+    'Se o usuário não quiser revisão, ele termina a mensagem com "sem review".',
+  ].join('\n');
+}
+
 function blockReason(files, changedLines) {
   return [
     `[review-gate] PR bloqueado: ${changedLines} linhas alteradas (git diff real) sem revisão independente.`,
     `Arquivos: ${files.join(', ')}`,
     '',
     'Antes de abrir o PR, obrigatoriamente:',
-    `1. Chame o Agent com subagent_type "${REVIEWER}". O prompt deve citar esses arquivos, o pedido original do usuário (literal), o que você diz que fez e como diz que verificou. Não passe opinião sobre a qualidade.`,
+    `1. Chame o Agent com subagent_type "${REVIEWER}"${reviewerModel(changedLines)}. O prompt deve citar esses arquivos, o pedido original do usuário (literal), o que você diz que fez e como diz que verificou. Não passe opinião sobre a qualidade.`,
     '2. O revisor precisa responder: o PR entrega o que foi pedido nesta sessão? Segue os padrões do projeto? Tem gambiarra, over engineering ou mudança que ninguém pediu?',
     '3. Não edite nada enquanto a revisão roda, senão ela é invalidada.',
     '4. Para cada achado blocker/major: corrija, ou refute com prova concreta.',
