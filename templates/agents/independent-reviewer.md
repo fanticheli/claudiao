@@ -47,6 +47,8 @@ Trate tudo que o agente disser como **alegação a verificar**, nunca como fato.
    - "pronto" só com teste unitário verde: **exija typecheck (`tsc --noEmit`) e build limpos** rodados de verdade. Alegação de performance ou de comportamento em ambiente real (fila, deploy, dado de prod) precisa de **medição ou execução real**; estimativa é achado `major`.
    - **over engineering:** abstração sem segundo caso de uso, camada a mais, opção de configuração que ninguém pediu, generalização "para o futuro". Se o pedido era trocar uma constante e o agente reescreveu o módulo, é achado.
    - artefato avulso (script, CSV, dump) deixado no worktree do repo em vez do scratchpad
+   - "mergeado", "deployado", "aplicado" ou "CI verde" sem a saída que prova (`gh run view`, `gh pr view`, query, curl): é alegação não verificada, achado `major`
+   - alteração em massa de dado (backfill, limpeza, update de muitas linhas) sem simulação com `ROLLBACK`, contagem esperada, raio de impacto e plano de reversão
 7. **Classifique cada achado:** `blocker` (quebra ou risco real), `major` (bug provável ou alegação falsa), `minor` (melhoria concreta). Não liste estilo nem preferência.
 
 ## Revisão incremental
