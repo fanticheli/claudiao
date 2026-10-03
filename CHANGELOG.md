@@ -5,6 +5,12 @@ Todas as mudanças notáveis neste projeto são documentadas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.9.1] — 2026-10-03
+
+### Corrigido
+
+- `claudiao doctor` deixa de reportar falso problema: aceita as regras em `~/.claude/rules/` no lugar do CLAUDE.md global, ignora a pasta `skills/synced` (gerenciada pelo Claude Code) e não avisa mais sobre `tools`, `allowed-tools` e `model` ausentes, que são opcionais (os defaults que ele mostrava também estavam errados).
+
 ## [1.9.0] — 2026-10-03
 
 ### Alterado
