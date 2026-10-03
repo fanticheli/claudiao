@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { execSync } from 'node:child_process';
 import chalk from 'chalk';
 import { CLAUDE_DIR, CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, CLAUDE_COMMANDS_DIR, CLAUDE_MD, CONFIG_FILE, getExternalRepoPath, getAgentsSource } from '../lib/paths.js';
+import { RULES_DIR } from '../lib/rules.js';
 import { isSymlink, getSymlinkTarget, isSymlinkBroken, resolveSymlinkTarget } from '../lib/symlinks.js';
 import { banner, success, warn, error, heading, dim, raw, debug } from '../lib/format.js';
 import {
@@ -19,6 +20,12 @@ import {
 } from '../lib/statusline.js';
 import { readSettings } from '../lib/hooks.js';
 import { getAttributionState } from '../lib/attribution.js';
+
+const CLAUDE_CODE_MANAGED_SKILL_DIRS = new Set(['synced']);
+
+function hasInstalledRules(): boolean {
+  return existsSync(RULES_DIR) && readdirSync(RULES_DIR).some((file) => file.endsWith('.md'));
+}
 
 export function doctor(): void {
   banner();
@@ -60,6 +67,8 @@ export function doctor(): void {
     } else {
       warn('CLAUDE.md global existe mas nao e symlink (nao sera atualizado automaticamente)');
     }
+  } else if (hasInstalledRules()) {
+    success(`Regras globais em ${RULES_DIR} (CLAUDE.md global nao usado)`);
   } else {
     warn('CLAUDE.md global nao instalado');
     dim('Rode: claudiao init');
@@ -94,7 +103,7 @@ export function doctor(): void {
   // 5. Skills
   if (existsSync(CLAUDE_SKILLS_DIR)) {
     const skills = readdirSync(CLAUDE_SKILLS_DIR, { withFileTypes: true })
-      .filter(d => d.isDirectory() || d.isSymbolicLink());
+      .filter(d => (d.isDirectory() || d.isSymbolicLink()) && !CLAUDE_CODE_MANAGED_SKILL_DIRS.has(d.name));
     let broken = 0;
 
     for (const skill of skills) {
@@ -216,7 +225,7 @@ export function doctor(): void {
   // 10. Frontmatter validation (skills)
   if (existsSync(CLAUDE_SKILLS_DIR)) {
     const skills = readdirSync(CLAUDE_SKILLS_DIR, { withFileTypes: true }).filter(
-      (d) => d.isDirectory() || d.isSymbolicLink(),
+      (d) => (d.isDirectory() || d.isSymbolicLink()) && !CLAUDE_CODE_MANAGED_SKILL_DIRS.has(d.name),
     );
     let errorCount = 0;
     let warnCount = 0;
