@@ -162,6 +162,14 @@ export const HOOK_CATEGORIES: HookCategory[] = [
     extraFiles: ['lib/shell.mjs'],
   },
   {
+    id: 'brevity',
+    name: 'Brevity reminder',
+    description: 'Lembra a cada mensagem: conclusão primeiro, uma pergunta, sem jargão nem ID sem explicação',
+    script: 'claudiao-brevity.mjs',
+    matcher: null,
+    event: 'UserPromptSubmit',
+  },
+  {
     id: 'pr',
     name: 'PR reminder',
     description: 'Lembra /pr-template e /security-checklist ao finalizar sessão com edits',
