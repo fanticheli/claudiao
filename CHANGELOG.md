@@ -5,14 +5,20 @@ Todas as mudanças notáveis neste projeto são documentadas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
-## [1.8.1] — 2026-09-16
-
-## [Unreleased]
+## [1.9.0] — 2026-10-03
 
 ### Alterado
 
 - `claudiao-review-gate`: depois de uma revisão, o gate conta só o que mudou desde ela. Correção pequena (abaixo do limite de linhas) não pede nova revisão; correção grande pede uma **revisão incremental** do diff desde a última revisão, em vez de revisar o PR inteiro de novo. Quem já instalou precisa rodar `claudiao hooks install` de novo.
 - Agente `independent-reviewer` passa a rodar em Sonnet e ganha o modo de revisão incremental. O gate pede `model: "opus"` para PR acima de 400 linhas.
+
+### Corrigido
+
+- O pacote publicado deixa de levar o `BACKLOG.md` e testes compilados antigos de `dist/lib/__tests__/`: o build agora limpa o `dist/` antes de compilar.
+- Contagens do README (agentes, skills e hooks) batiam com uma versão antiga. Um teste agora falha se o README divergir dos templates.
+- `package.json` ganhou `repository`, `homepage` e `bugs`.
+
+## [1.8.1] — 2026-09-16
 
 ### Adicionado
 
@@ -20,9 +26,6 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ### Corrigido
 
-- O pacote publicado deixa de levar o `BACKLOG.md` e testes compilados antigos de `dist/lib/__tests__/`: o build agora limpa o `dist/` antes de compilar.
-- Contagens do README (agentes, skills e hooks) batiam com uma versão antiga. Um teste agora falha se o README divergir dos templates.
-- `package.json` ganhou `repository`, `homepage` e `bugs`.
 - `claudiao-review-gate`: depois de uma revisão, o escopo do PR voltava a ser contado a partir da árvore revisada, então o gate passava a cobrar arquivos que já tinham sido mergeados na branch base. A base agora fica sempre no merge-base, e a revisão continua valendo enquanto nada revisável mudar depois dela. Quem já instalou precisa rodar `claudiao hooks install` de novo, porque hook é cópia, não symlink.
 
 ## [1.8.0] — 2026-09-15
