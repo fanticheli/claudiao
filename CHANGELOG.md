@@ -5,6 +5,17 @@ Todas as mudanças notáveis neste projeto são documentadas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [Unreleased]
+
+### Adicionado
+
+- Hook `brevity` (`UserPromptSubmit`): a cada mensagem do usuário, lembra o Claude de abrir com a conclusão, fazer uma pergunta só, não oferecer menu de opções e não usar ID ou sigla sem explicar.
+
+### Alterado
+
+- `independent-reviewer` passa a tratar "mergeado/deployado/CI verde" sem saída que prove como achado `major`, e cobra simulação, contagem e plano de reversão em alteração de dado em massa.
+- `pr-reviewer`, em novo review da mesma PR, compara o SHA com o review anterior e lista os commits novos antes de concluir.
+
 ## [1.9.1] — 2026-10-03
 
 ### Corrigido
