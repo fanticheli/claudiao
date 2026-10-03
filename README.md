@@ -2,7 +2,7 @@
 
 CLI que instala e gerencia agentes, skills, hooks e CLAUDE.md global para o [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
-> Seu Claude Code no próximo nível. **18 agentes + 9 skills + 6 hooks + statusline de contexto + CLAUDE.md global + wizard de criação + doctor** — tudo em um comando.
+> Seu Claude Code no próximo nível. **20 agentes + 11 skills + 11 hooks + statusline de contexto + CLAUDE.md global + wizard de criação + doctor** — tudo em um comando.
 
 ## Pra quem é isso?
 
@@ -51,8 +51,8 @@ claudiao init
 Isso instala tudo interativamente:
 
 1. **CLAUDE.md global** — regras universais em `~/.claude/CLAUDE.md`
-2. **18 agentes** — symlinks em `~/.claude/agents/`
-3. **9 skills** — symlinks em `~/.claude/skills/`
+2. **20 agentes** — symlinks em `~/.claude/agents/`
+3. **11 skills** — symlinks em `~/.claude/skills/`
 
 Depois, abra o Claude Code em qualquer projeto (`claude`) e os agentes já estão ativos. Não precisa fazer mais nada.
 
@@ -67,11 +67,11 @@ claudiao init
   ├── agents/
   │   ├── aws-specialist.md  → symlink pro template bundled
   │   ├── react-specialist.md
-  │   └── ... (18 agentes)
+  │   └── ... (20 agentes)
   └── skills/
       ├── security-checklist/ → symlink pro template bundled
       ├── pr-template/
-      └── ... (9 skills)
+      └── ... (11 skills)
 ```
 
 **Symlinks** permitem live reload — se você editar um template (ou rodar `claudiao update`), a mudança reflete no Claude Code sem reinstalar.
@@ -331,7 +331,7 @@ O claudião gerencia agents, skills, hooks e CLAUDE.md global dentro de `~/.clau
 - **Plugins do Claude Code** (instalados via `claude /plugin install <nome>`) — ex: `superpowers`, `get-shit-done` (GSD), `claude-mem`. Esses plugins podem adicionar agents, hooks e skills em `~/.claude/` independente do claudião, com ciclo de vida próprio.
 - **Customizações manuais** do usuário — arquivos `.md` criados direto em `~/.claude/agents/` ou similar.
 - **Repo externo** configurado via `.claudiao.json` com `repoPath`.
-- **Core do claudião** — os 18 agents, 9 skills, 6 hooks e CLAUDE.md global bundled no pacote.
+- **Core do claudião** — os 20 agents, 11 skills, 11 hooks e CLAUDE.md global bundled no pacote.
 
 **O que o claudião gerencia:** apenas os itens instalados pelo próprio claudião. São identificáveis por serem symlinks pros templates do pacote ou do repo externo configurado. A coluna `source` em `claudiao list agents/skills` (`[core|external|local]`) ajuda a distinguir.
 
