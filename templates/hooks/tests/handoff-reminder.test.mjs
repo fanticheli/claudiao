@@ -104,6 +104,19 @@ describe('handoff reminder', () => {
     assert.equal(decide({ session_id: 's4', cwd: repo, transcript_path: transcript }, env), null);
   });
 
+  test('end to end through stdin blocks with the clear reminder', () => {
+    const transcript = writeTranscript(sandbox, MIN_TRANSCRIPT_BYTES, [join(repo, 'src', 'a.ts')]);
+    const run = spawnSync('node', [HOOK], {
+      input: JSON.stringify({ session_id: 'e2e', cwd: repo, transcript_path: transcript }),
+      encoding: 'utf-8',
+      env: { ...process.env, HOME: env.homeDir, TMPDIR: env.tempDir },
+    });
+    assert.equal(run.status, 0);
+    const output = JSON.parse(run.stdout);
+    assert.equal(output.decision, 'block');
+    assert.equal(output.systemMessage, CLEAR_REMINDER);
+  });
+
   test('end to end through stdin ignores garbage', () => {
     const garbage = spawnSync('node', [HOOK], { input: 'not json', encoding: 'utf-8' });
     assert.equal(garbage.status, 0);
