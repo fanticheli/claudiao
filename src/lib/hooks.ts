@@ -177,6 +177,14 @@ export const HOOK_CATEGORIES: HookCategory[] = [
     matcher: null,
     event: 'Stop',
   },
+  {
+    id: 'handoff',
+    name: 'Handoff reminder',
+    description: 'Em sessão longa, pede o handoff ao Claude e avisa você para rodar /clear',
+    script: 'claudiao-handoff-reminder.mjs',
+    matcher: null,
+    event: 'Stop',
+  },
 ];
 
 const LEGACY_SCRIPT_EXT = '.sh';
