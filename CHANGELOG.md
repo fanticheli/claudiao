@@ -5,6 +5,13 @@ Todas as mudanças notáveis neste projeto são documentadas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.11.0] — 2026-11-14
+
+### Adicionado
+
+- Hook `handoff` (`Stop`): em sessão longa (transcript acima de 300 KB) que editou arquivos do repositório atual, inclusive em worktrees dele, pede ao Claude uma vez por sessão o handoff em `memory/session-handoff.md` e mostra ao usuário o lembrete de rodar `/clear` e começar a próxima tarefa do zero. Sessão que só terminou dentro de um repositório sem editá-lo não dispara.
+- Skill `/task`: antes de editar, o Claude responde objetivo, arquivos confirmados com busca, padrão existente a copiar, critério de pronto e o que fica fora do escopo. Com mais de 3 arquivos, propõe o plano e espera o ok.
+
 ## [1.10.0] — 2026-10-03
 
 ### Adicionado
