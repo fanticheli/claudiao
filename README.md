@@ -2,7 +2,7 @@
 
 CLI que instala e gerencia agentes, skills, hooks e CLAUDE.md global para o [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
-> Seu Claude Code no próximo nível. **20 agentes + 11 skills + 12 hooks + statusline de contexto + CLAUDE.md global + wizard de criação + doctor** — tudo em um comando.
+> Seu Claude Code no próximo nível. **20 agentes + 12 skills + 13 hooks + statusline de contexto + CLAUDE.md global + wizard de criação + doctor** — tudo em um comando.
 
 ## Pra quem é isso?
 
@@ -52,7 +52,7 @@ Isso instala tudo interativamente:
 
 1. **CLAUDE.md global** — regras universais em `~/.claude/CLAUDE.md`
 2. **20 agentes** — symlinks em `~/.claude/agents/`
-3. **11 skills** — symlinks em `~/.claude/skills/`
+3. **12 skills** — symlinks em `~/.claude/skills/`
 
 Depois, abra o Claude Code em qualquer projeto (`claude`) e os agentes já estão ativos. Não precisa fazer mais nada.
 
@@ -71,7 +71,7 @@ claudiao init
   └── skills/
       ├── security-checklist/ → symlink pro template bundled
       ├── pr-template/
-      └── ... (11 skills)
+      └── ... (12 skills)
 ```
 
 **Symlinks** permitem live reload — se você editar um template (ou rodar `claudiao update`), a mudança reflete no Claude Code sem reinstalar.
@@ -226,7 +226,7 @@ Hooks são injetados pelo Claude Code em momentos-chave. A maioria são lembrete
 A partir da v1.2.0 os scripts são Node.js (`.mjs`) e funcionam em Linux, macOS e Windows nativo sem dependências externas.
 
 ```bash
-claudiao hooks install                         # seleção interativa dos 12 hooks bundled
+claudiao hooks install                         # seleção interativa dos 13 hooks bundled
 claudiao rules install                         # instala as regras globais em ~/.claude/rules
 claudiao rules list                            # mostra quais regras estão instaladas
 claudiao hooks install --only security,pr      # instala apenas os categorias informadas
@@ -277,6 +277,7 @@ Escreve em `~/.claude/settings.json` via merge atômico (preserva o resto da con
 | `commit` | `PreToolUse` | `Bash` com `git commit -m "..."` | Lembrete (não bloqueia) do formato conventional commits. Se você instalar o `commit-message`, que bloqueia, não precisa deste |
 | `brevity` | `UserPromptSubmit` | (sem matcher) | Lembrete curto a cada mensagem: conclusão em 1-2 frases, uma pergunta só, sem menu de opções nem ID sem explicação |
 | `pr` | `Stop` | (sem matcher) | `/pr-template` + `/security-checklist` no fim de sessão com edits — fecha o loop do fluxo |
+| `handoff` | `Stop` | (sem matcher) | Em sessão longa (transcript acima de 300 KB), pede ao Claude o handoff em `memory/session-handoff.md` uma vez por sessão e avisa você para rodar `/clear` |
 | `english-code` | `PreToolUse` (bloqueia) | `Write\|Edit` criando arquivo novo de código | **Nega** arquivo novo com nome ou identificadores em português (edição de arquivo existente passa) |
 | `commit-message` | `PreToolUse` (bloqueia) | `Bash` com `git` + `commit` | **Nega** mensagem fora de `type(scope): description`, escrita em português ou com atribuição de IA |
 | `credentials` | `PreToolUse` (bloqueia) + `UserPromptSubmit` | `Bash` | **Nega** credencial inline (`PGPASSWORD=`, `--password`, header `Authorization`, `user:senha@host`, `-u user:senha`); quando o segredo vem no prompt, avisa o Claude para não reusar |
@@ -310,7 +311,7 @@ Escreve em `~/.claude/settings.json` via merge atômico (preserva o resto da con
 | | `dod-specialist` | Definition of Done mensurável e progressiva |
 | **Fluxo Jira + Slack** | `daily-reporter` | Monta card, comentário ou mensagem, mostra preview e só publica após aprovação |
 
-## Skills incluídas (11)
+## Skills incluídas (12)
 
 | Comando | O que faz |
 |---------|-----------|
@@ -324,6 +325,7 @@ Escreve em `~/.claude/settings.json` via merge atômico (preserva o resto da con
 | `/security-checklist` | Checklist pré-deploy com OWASP Top 10, headers, secrets, dependências |
 | `/session-insights` | Minera o histórico de sessões, acha os erros que o Claude repete com você e propõe contramedidas |
 | `/sql-templates` | Templates SQL para diagnóstico de performance, migrations zero-downtime e indexes |
+| `/task` | Abre uma tarefa de código com objetivo, arquivos, padrão a copiar, critério de pronto e fora do escopo antes de editar |
 | `/ui-review-checklist` | 30+ items de revisão de UI: hierarquia visual, acessibilidade, responsividade |
 
 ## Relação com outros plugins do Claude Code
@@ -335,7 +337,7 @@ O claudião gerencia agents, skills, hooks e CLAUDE.md global dentro de `~/.clau
 - **Plugins do Claude Code** (instalados via `claude /plugin install <nome>`) — ex: `superpowers`, `get-shit-done` (GSD), `claude-mem`. Esses plugins podem adicionar agents, hooks e skills em `~/.claude/` independente do claudião, com ciclo de vida próprio.
 - **Customizações manuais** do usuário — arquivos `.md` criados direto em `~/.claude/agents/` ou similar.
 - **Repo externo** configurado via `.claudiao.json` com `repoPath`.
-- **Core do claudião** — os 20 agents, 11 skills, 12 hooks e CLAUDE.md global bundled no pacote.
+- **Core do claudião** — os 20 agents, 12 skills, 13 hooks e CLAUDE.md global bundled no pacote.
 
 **O que o claudião gerencia:** apenas os itens instalados pelo próprio claudião. São identificáveis por serem symlinks pros templates do pacote ou do repo externo configurado. A coluna `source` em `claudiao list agents/skills` (`[core|external|local]`) ajuda a distinguir.
 
