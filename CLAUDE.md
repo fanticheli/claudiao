@@ -62,6 +62,7 @@ O hook lê o payload de `fd 0`, e sem o guard qualquer `import` das suas funçõ
 - o revisor roda em Sonnet; o gate pede `model: "opus"` quando o diff passa de 400 linhas;
 - o registro da revisão e o bloqueio usam a **mesma** base; se divergirem, o PR trava sem saída;
 - o gate julga só o repo onde o PR está sendo aberto;
+- ao lançar o revisor, o retrato cobre só os repos citados no prompt (caminho absoluto ou `~/`) e o da pasta atual; sem nenhum, usa o repo do último PR bloqueado. Retratar todos os repos que a sessão tocou estourava o timeout de 5 s do hook em sessão longa, e a revisão nunca era registrada;
 - o prompt do revisor precisa citar todos os arquivos alterados;
 - o usuário libera terminando a mensagem com `sem review`.
 

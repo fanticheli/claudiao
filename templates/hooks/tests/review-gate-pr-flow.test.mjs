@@ -127,3 +127,48 @@ describe('a PR whose work was done in an earlier session', () => {
     assert.match(s.openPr().deny, /later\.ts/);
   });
 });
+
+describe('a reviewer launched from a session that touched several repos', () => {
+  function multiRepoSession() {
+    const prRepo = createRepo();
+    gitIn(prRepo, 'checkout', '-qb', 'feature/pr');
+    writeFileSync(join(prRepo, 'src', 'big.ts'), code(200, 'big'));
+    const otherRepo = createRepo();
+    const state = emptyState();
+    const cwd = mkdtempSync(join(tmpdir(), 'gate-plans-'));
+    const fire = (payload) => handle({ cwd, ...payload }, state, 5_000_000);
+    const touch = (repo) => fire({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: `git -C ${repo} status` } });
+    touch(prRepo);
+    touch(otherRepo);
+    return {
+      prRepo,
+      otherRepo,
+      state,
+      launchReviewer: (prompt) => fire({ hook_event_name: 'PreToolUse', tool_name: 'Agent', tool_input: { subagent_type: REVIEWER, prompt } }),
+      reviewerStop: () => fire({ hook_event_name: 'SubagentStop', agent_type: REVIEWER, agent_id: 'r1' }),
+      openPr: () => fire({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: `cd ${prRepo} && gh pr create --fill` } }),
+    };
+  }
+
+  test('snapshots only the repo cited in the prompt', () => {
+    const s = multiRepoSession();
+    assert.equal(s.launchReviewer(`revise ${join(s.prRepo, 'src', 'big.ts')}`), null);
+    assert.deepEqual(Object.keys(s.state.pending[0].trees), [s.prRepo]);
+  });
+
+  test('registers the review even when another repo changes while it runs', () => {
+    const s = multiRepoSession();
+    s.launchReviewer(`revise ${join(s.prRepo, 'src', 'big.ts')}`);
+    writeFileSync(join(s.otherRepo, 'src', 'parallel.ts'), code(100, 'p'));
+    assert.equal(s.reviewerStop(), null);
+    assert.ok(s.state.repos[s.prRepo].reviewed);
+    assert.equal(s.openPr(), null);
+  });
+
+  test('falls back to the repo of the last blocked PR when the prompt cites only file names', () => {
+    const s = multiRepoSession();
+    assert.ok(s.openPr()?.deny);
+    assert.equal(s.launchReviewer('revise big.ts'), null);
+    assert.deepEqual(Object.keys(s.state.pending[0].trees), [s.prRepo]);
+  });
+});
