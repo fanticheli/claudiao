@@ -20,8 +20,8 @@ O [Claude Code](https://docs.anthropic.com/en/docs/claude-code) é uma CLI da An
 
 | O que | Quantidade | Descrição |
 |-------|-----------|-----------|
-| **Agentes** | 18 | Subagents que o Claude Code invoca automaticamente pelo contexto (ex: perguntou sobre AWS? o `aws-specialist` entra em ação) |
-| **Skills** | 9 | Slash commands com templates e checklists prontos (ex: `/security-checklist` antes de deploy) |
+| **Agentes** | 20 | Subagents que o Claude Code invoca automaticamente pelo contexto (ex: perguntou sobre AWS? o `aws-specialist` entra em ação) |
+| **Skills** | 12 | Slash commands com templates e checklists prontos (ex: `/security-checklist` antes de deploy) |
 | **CLAUDE.md global** | 1 | Regras universais de código, git workflow e referência a todos os agentes/skills — muda o comportamento do Claude Code em **todos** os seus projetos |
 | **Statusline de contexto** | 1 | Barra no rodapé do Claude Code mostrando dir, branch, modelo, % de contexto usado e custo acumulado da sessão |
 | **Wizard de criação** | — | Crie seus próprios agentes e skills com um wizard interativo |
@@ -146,16 +146,6 @@ Na prática, isso significa que ao abrir `claude` em qualquer projeto, ele já s
 
 Se você já tem um `~/.claude/CLAUDE.md` próprio, o `claudiao init` pergunta antes de sobrescrever.
 
-## Plugins do Claude Code
-
-A partir da v1.4.0, o claudião **não gerencia mais plugins de terceiros**. Pra instalar plugins como `superpowers`, `claude-mem` ou outros disponíveis no marketplace do Claude Code, use o comando nativo:
-
-```bash
-claude /plugin install <nome-do-plugin>
-```
-
-Plugins e agents/skills/hooks do claudião coexistem pacificamente — cada um gerenciado pela sua ferramenta nativa. Veja a [documentação oficial de plugins](https://docs.claude.com/en/docs/claude-code/plugins).
-
 ## Comandos
 
 ### Configuração
@@ -235,7 +225,7 @@ claudiao hooks uninstall                       # remove apenas os hooks do claud
 claudiao hooks uninstall --only pr             # remove apenas uma categoria
 ```
 
-Os hooks editam `~/.claude/settings.json` fazendo merge (não overwrite) — hooks de outros plugins ficam intactos. Scripts ficam em `~/.claude/hooks/claudiao-*.mjs` e podem ser editados pra customizar as mensagens.
+Os hooks editam `~/.claude/settings.json` fazendo merge (não overwrite) — hooks que você já tinha ficam intactos. Scripts ficam em `~/.claude/hooks/claudiao-*.mjs` e podem ser editados pra customizar as mensagens.
 
 ### Statusline de contexto (v1.5.0+)
 
@@ -328,25 +318,11 @@ Escreve em `~/.claude/settings.json` via merge atômico (preserva o resto da con
 | `/task` | Abre uma tarefa de código com objetivo, arquivos, padrão a copiar, critério de pronto e fora do escopo antes de editar |
 | `/ui-review-checklist` | 30+ items de revisão de UI: hierarquia visual, acessibilidade, responsividade |
 
-## Relação com outros plugins do Claude Code
+## O que o claudião gerencia em `~/.claude/`
 
-O claudião gerencia agents, skills, hooks e CLAUDE.md global dentro de `~/.claude/`. Esse diretório pode conter itens instalados por **outras fontes** — é importante entender o que o claudião gerencia e o que não.
+O claudião gerencia o que ele mesmo instalou: symlinks pros templates do pacote ou do repo externo configurado em `.claudiao.json`, os hooks `claudiao-*.mjs`, as regras e o CLAUDE.md global. A coluna `source` em `claudiao list agents/skills` (`[core|external|local]`) mostra a origem de cada item.
 
-**Fontes que convivem em `~/.claude/`**:
-
-- **Plugins do Claude Code** (instalados via `claude /plugin install <nome>`) — ex: `superpowers`, `get-shit-done` (GSD), `claude-mem`. Esses plugins podem adicionar agents, hooks e skills em `~/.claude/` independente do claudião, com ciclo de vida próprio.
-- **Customizações manuais** do usuário — arquivos `.md` criados direto em `~/.claude/agents/` ou similar.
-- **Repo externo** configurado via `.claudiao.json` com `repoPath`.
-- **Core do claudião** — os 20 agents, 12 skills, 13 hooks e CLAUDE.md global bundled no pacote.
-
-**O que o claudião gerencia:** apenas os itens instalados pelo próprio claudião. São identificáveis por serem symlinks pros templates do pacote ou do repo externo configurado. A coluna `source` em `claudiao list agents/skills` (`[core|external|local]`) ajuda a distinguir.
-
-**O que o claudião NÃO gerencia:**
-
-- Agents e hooks instalados por plugins como `superpowers` ou `get-shit-done` — esses seguem o ciclo de vida do plugin. Use `claude /plugin` pra gerenciá-los.
-- Arquivos criados manualmente pelo usuário em `~/.claude/`.
-
-Se `claudiao doctor` reporta warnings em agents cujos nomes começam com `gsd-` ou similar, eles provavelmente vêm de um plugin instalado separadamente (não do claudião). Rode `claude /plugin list` pra ver plugins ativos do Claude Code.
+Arquivos que você criou direto em `~/.claude/agents/`, `~/.claude/skills/` ou similar aparecem como `local`. O claudião só mexe neles em dois casos: quando o nome coincide com um template (o `init` guarda o seu arquivo como backup antes de criar o symlink) ou quando você roda `claudiao remove` nele.
 
 ## Repo externo (avançado)
 
@@ -471,12 +447,6 @@ rm -f ~/.claude/.claudiao.json
 
 # Remove a CLI
 npm uninstall -g claudiao
-```
-
-Plugins do Claude Code (se tiver instalado algum via `claude /plugin install`) são removidos com o comando nativo:
-
-```bash
-claude /plugin remove <nome-do-plugin>
 ```
 
 ## Licença
