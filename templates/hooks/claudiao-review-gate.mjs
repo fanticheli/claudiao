@@ -445,8 +445,7 @@ function pullRequestRoots(payload, state, now) {
     if (root) candidates.add(root);
   }
   for (const root of candidates) trackRepo(state, root, now);
-  const known = [...candidates].filter((root) => state.repos[root]);
-  return known.length > 0 ? known : Object.keys(state.repos);
+  return [...candidates].filter((root) => state.repos[root]);
 }
 
 function pullRequestDecision(payload, state, now) {
@@ -455,9 +454,9 @@ function pullRequestDecision(payload, state, now) {
   if (state.pending.length > 0) {
     return { deny: '[review-gate] Revisão independente ainda rodando. Espere o resultado, trate os achados e só então abra o PR.' };
   }
-  const roots = pullRequestRoots(payload, state, now);
-  state.lastPullRequestRoots = roots;
-  const { files, unverifiable, reviewed } = reviewableChanges(state, now, roots);
+  const known = pullRequestRoots(payload, state, now);
+  state.lastPullRequestRoots = known;
+  const { files, unverifiable, reviewed } = reviewableChanges(state, now, known.length > 0 ? known : Object.keys(state.repos));
   const warning = unverifiable.length > 0 ? `[review-gate] Não consegui verificar ${unverifiable.map(displayPath).join(', ')} (git lento ou indisponível); essas mudanças NÃO foram checadas pelo gate.` : null;
   const changedLines = files.reduce((sum, file) => sum + file.lines, 0);
   if (changedLines < MIN_CHANGED_LINES()) return warning ? { message: warning } : null;

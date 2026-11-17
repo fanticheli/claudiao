@@ -172,3 +172,16 @@ describe('a reviewer launched from a session that touched several repos', () => 
     assert.deepEqual(Object.keys(s.state.pending[0].trees), [s.prRepo]);
   });
 });
+
+describe('a PR opened from outside any repo', () => {
+  test('does not remember every tracked repo as the last PR scope', () => {
+    const repo = createRepo();
+    writeFileSync(join(repo, 'src', 'big.ts'), code(200, 'big'));
+    const state = emptyState();
+    const cwd = mkdtempSync(join(tmpdir(), 'gate-plans-'));
+    const fire = (payload) => handle({ cwd, ...payload }, state, 5_000_000);
+    fire({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: `git -C ${repo} status` } });
+    assert.ok(fire({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'gh pr create --fill' } })?.deny);
+    assert.deepEqual(state.lastPullRequestRoots, []);
+  });
+});
