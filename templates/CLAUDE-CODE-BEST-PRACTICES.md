@@ -1,6 +1,6 @@
 # Guia Prático — Claude Code no Dia a Dia
 
-Como usar o Claude Code de forma eficiente em projetos reais. Inclui cenários do dia a dia, integração com plugins da comunidade, e os agentes/skills deste toolkit.
+Como usar o Claude Code de forma eficiente em projetos reais. Inclui cenários do dia a dia e os agentes/skills deste toolkit.
 
 ---
 
@@ -273,7 +273,7 @@ O Claude Code aloca mais tokens de raciocínio com keywords específicas. Funcio
 
 ## 6. Agentes Deste Toolkit na Prática
 
-Os 18 agentes são invocados **automaticamente** pelo Claude Code quando detecta que a tarefa casa com a especialidade.
+Os 20 agentes são invocados **automaticamente** pelo Claude Code quando detecta que a tarefa casa com a especialidade.
 
 ### Cenários reais → agente ativado
 
@@ -314,95 +314,7 @@ Os 18 agentes são invocados **automaticamente** pelo Claude Code quando detecta
 
 ---
 
-## 7. Plugins da Comunidade: Quando Usar Cada Um
-
-Instale com `claudiao install plugin <nome>`.
-
-### superpowers — Metodologia de desenvolvimento
-
-Complementa os agentes com **workflow de TDD e debugging**.
-
-```bash
-# TDD enforced — ele recusa implementar sem teste primeiro
-> Implemente o serviço de notificações com TDD.
-# superpowers força: escreva teste RED → implemente GREEN → REFACTOR
-
-# Debugging sistemático em 4 fases
-> Tenho um bug: [descrição]
-# superpowers segue: Reproduce → Isolate → Fix → Verify
-
-# Git worktrees — branches isoladas
-> Preciso trabalhar nessa feature sem afetar main.
-# superpowers cria worktree isolado automaticamente
-```
-
-**Quando usar**: Sempre que quiser disciplina de TDD ou debugging estruturado. Funciona junto com `test-specialist` e `pr-reviewer`.
-
-### get-shit-done — Planejamento estruturado
-
-Complementa `implementation-planner` e `idea-refiner` com **persistência de estado**.
-
-```bash
-# Projeto novo do zero
-> /gsd:new-project
-# Faz perguntas → pesquisa → gera REQUIREMENTS.md + ROADMAP.md
-
-# Mapear projeto existente (brownfield)
-> /gsd:map-codebase
-# Analisa o projeto e gera documentação da arquitetura
-
-# Ciclo completo de feature
-> /gsd:discuss-phase    # Captura decisões
-> /gsd:plan-phase       # Pesquisa + planejamento
-> /gsd:execute-phase    # Executa em waves paralelas com commits atômicos
-> /gsd:verify-work      # Testes de aceitação
-```
-
-**Quando usar**: Projetos longos que precisam de estado persistido entre sessões. Mantém PROJECT.md, REQUIREMENTS.md, ROADMAP.md e STATE.md atualizados.
-
-### claude-mem — Memória entre sessões
-
-Resolve o problema de **perder contexto quando fecha o terminal**.
-
-```bash
-# Buscar memórias de sessões anteriores
-> /mem-search "como configuramos o auth?"
-# Retorna decisões e contexto de sessões passadas
-
-# Funciona automaticamente via hooks — captura:
-# - Decisões de arquitetura tomadas
-# - Bugs resolvidos e a causa raiz
-# - Padrões descobertos no código
-# - Comandos que funcionaram
-```
-
-**Quando usar**: Projetos longos onde você toma muitas decisões técnicas ao longo de semanas. Especialmente útil se trabalha em múltiplos projetos e precisa retomar contexto.
-
-### Como os 3 trabalham juntos
-
-```
-Sessão 1 (segunda-feira):
-├── /gsd:new-project         → Cria roadmap do projeto
-├── implementation-planner   → Quebra milestone 1 em tasks
-├── architect                → Decide arquitetura (ADR)
-└── claude-mem               → Salva tudo automaticamente
-
-Sessão 2 (terça-feira):
-├── /mem-search "decisões"   → Recupera contexto da sessão 1
-├── /gsd:execute-phase       → Implementa tasks com TDD (superpowers)
-├── test-specialist          → Estratégia de testes
-├── pr-reviewer              → Review antes do merge
-└── /security-checklist      → Valida segurança pré-merge
-
-Sessão 3 (quarta-feira):
-├── /gsd:verify-work         → Testes de aceitação
-├── /gsd:complete-milestone  → Arquiva e tageia release
-└── claude-mem               → Contexto completo preservado
-```
-
----
-
-## 8. Dicas Práticas
+## 7. Dicas Práticas
 
 ### /clear entre tarefas
 
@@ -459,7 +371,7 @@ Nunca tenha medo de deixar o Claude tentar algo. `/undo` sempre te salva.
 
 ---
 
-## 9. Hooks: Qualidade Automática
+## 8. Hooks: Qualidade Automática
 
 Configure em `~/.claude/hooks.json` pra rodar lint/typecheck automaticamente após cada edição:
 
@@ -478,7 +390,7 @@ Configure em `~/.claude/hooks.json` pra rodar lint/typecheck automaticamente ap�
 
 ---
 
-## 10. Atalhos de Teclado
+## 9. Atalhos de Teclado
 
 | Atalho | O que faz |
 |--------|-----------|
