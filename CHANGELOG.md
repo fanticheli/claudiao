@@ -5,6 +5,20 @@ Todas as mudanças notáveis neste projeto são documentadas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.11.1] — 2026-11-17
+
+### Corrigido
+
+- `claudiao-review-gate`: em sessão longa, a revisão do `independent-reviewer` nunca era registrada e o `gh pr create` continuava bloqueado. Ao lançar o revisor, o hook tirava retrato de todos os repos tocados na sessão e estourava o timeout de 5 s. Agora retrata só os repos citados no prompt do revisor e o da pasta atual. Quem já instalou precisa rodar `claudiao hooks install` de novo.
+
+### Alterado
+
+- Agente `independent-reviewer` e `claudiao-review-gate`: a revisão local antes do PR cobre só a qualidade da implementação; testes, typecheck e build ficam com a CI.
+
+### Documentação
+
+- README, guia de boas práticas e descrição do pacote no npm sem as menções à gestão de plugins, removida na v1.5.0. Contagem de agentes e skills corrigida no README e no guia.
+
 ## [1.11.0] — 2026-11-14
 
 ### Adicionado
