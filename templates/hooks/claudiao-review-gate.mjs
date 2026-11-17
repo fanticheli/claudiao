@@ -201,7 +201,7 @@ export function changedFiles(root, fromTree, toTree) {
 }
 
 export function emptyState() {
-  return { repos: {}, pending: [], skip: false, unavailable: {}, failedThisTurn: {} };
+  return { repos: {}, pending: [], skip: false, unavailable: {}, failedThisTurn: {}, lastPullRequestRoots: [] };
 }
 
 function snapshotOrMark(state, root, now) {
@@ -398,7 +398,7 @@ export function onPreToolUse(payload, state, now) {
   const input = payload.tool_input ?? {};
 
   if (AGENT_TOOLS.has(toolName) && input.subagent_type === REVIEWER) {
-    const { files, trees } = reviewableChanges(state, now);
+    const { files, trees } = reviewableChanges(state, now, reviewerRoots(input.prompt, payload.cwd, state));
     const names = [...new Set(files.map((file) => basename(file.path)))];
     if (names.length > 0) {
       const prompt = String(input.prompt ?? '');
@@ -419,6 +419,16 @@ export function onPreToolUse(payload, state, now) {
     if (isPullRequestCommand(payload)) return pullRequestDecision(payload, state, now);
   }
   return null;
+}
+
+export function reviewerRoots(prompt, cwd, state) {
+  const text = String(prompt ?? '');
+  const cited = Object.keys(state.repos).filter((root) => text.includes(`${root}/`) || text.includes(`${displayPath(root)}/`));
+  const cwdRoot = repoRoot(cwd);
+  if (cwdRoot && state.repos[cwdRoot] && !cited.includes(cwdRoot)) cited.push(cwdRoot);
+  if (cited.length > 0) return cited;
+  const lastPullRequest = state.lastPullRequestRoots.filter((root) => state.repos[root]);
+  return lastPullRequest.length > 0 ? lastPullRequest : null;
 }
 
 export function isPullRequestCommand(payload) {
@@ -445,7 +455,9 @@ function pullRequestDecision(payload, state, now) {
   if (state.pending.length > 0) {
     return { deny: '[review-gate] Revisão independente ainda rodando. Espere o resultado, trate os achados e só então abra o PR.' };
   }
-  const { files, unverifiable, reviewed } = reviewableChanges(state, now, pullRequestRoots(payload, state, now));
+  const roots = pullRequestRoots(payload, state, now);
+  state.lastPullRequestRoots = roots;
+  const { files, unverifiable, reviewed } = reviewableChanges(state, now, roots);
   const warning = unverifiable.length > 0 ? `[review-gate] Não consegui verificar ${unverifiable.map(displayPath).join(', ')} (git lento ou indisponível); essas mudanças NÃO foram checadas pelo gate.` : null;
   const changedLines = files.reduce((sum, file) => sum + file.lines, 0);
   if (changedLines < MIN_CHANGED_LINES()) return warning ? { message: warning } : null;
@@ -588,6 +600,7 @@ export function normalizeState(raw) {
   if (typeof raw.skip === 'boolean') state.skip = raw.skip;
   if (isPlainObject(raw.unavailable)) state.unavailable = raw.unavailable;
   if (isPlainObject(raw.failedThisTurn)) state.failedThisTurn = raw.failedThisTurn;
+  if (Array.isArray(raw.lastPullRequestRoots)) state.lastPullRequestRoots = raw.lastPullRequestRoots.filter((root) => typeof root === 'string');
   return state;
 }
 
