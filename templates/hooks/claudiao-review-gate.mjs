@@ -499,11 +499,11 @@ function blockReason(files, changedLines) {
     `Arquivos: ${files.join(', ')}`,
     '',
     'Antes de abrir o PR, obrigatoriamente:',
-    `1. Chame o Agent com subagent_type "${REVIEWER}"${reviewerModel(changedLines)}. O prompt deve citar esses arquivos, o pedido original do usuário (literal), o que você diz que fez e como diz que verificou. Não passe opinião sobre a qualidade.`,
+    `1. Chame o Agent com subagent_type "${REVIEWER}"${reviewerModel(changedLines)}. O prompt deve citar esses arquivos, o pedido original do usuário (literal) e o que você diz que fez. Não passe opinião sobre a qualidade. Testes ficam com a CI: não rode antes do PR.`,
     '2. O revisor precisa responder: o PR entrega o que foi pedido nesta sessão? Segue os padrões do projeto? Tem gambiarra, over engineering ou mudança que ninguém pediu?',
     '3. Não edite nada enquanto a revisão roda, senão ela é invalidada.',
     '4. Para cada achado blocker/major: corrija, ou refute com prova concreta.',
-    '5. No corpo do PR e na resposta final, inclua a seção "Revisão independente": veredito, verificações executadas, achados e o destino de cada um.',
+    '5. No corpo do PR e na resposta final, inclua a seção "Revisão independente": veredito, achados e o destino de cada um.',
     'Se o usuário não quiser revisão, ele termina a mensagem com "sem review".',
   ].join('\n');
 }

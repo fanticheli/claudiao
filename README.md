@@ -299,7 +299,7 @@ Escreve em `~/.claude/settings.json` via merge atômico (preserva o resto da con
 | | `azure-specialist` | App Service, AKS, Functions, Bicep |
 | | `gcp-specialist` | Cloud Run, GKE, BigQuery, Terraform GCP |
 | **Qualidade** | `pr-reviewer` | Code review com severidade (blocker/importante/sugestão) |
-| **Qualidade** | `independent-reviewer` | Revisor cético somente leitura usado pelo hook `review-gate`: lê o diff real, roda testes/typecheck e tenta provar que a implementação está errada. Roda em Sonnet; o gate pede Opus para PR acima de 400 linhas |
+| **Qualidade** | `independent-reviewer` | Revisor cético somente leitura usado pelo hook `review-gate`: lê o diff da branch com o mesmo critério do AI Code Review da PR e aponta pedido não entregue, gambiarra, over engineering e escopo a mais. Não roda testes (ficam com a CI). Roda em Sonnet; o gate pede Opus para PR acima de 400 linhas |
 | | `test-specialist` | Estratégia de testes, TDD, cobertura, mocks |
 | | `security-specialist` | OWASP Top 10, SAST, secrets, auth, hardening |
 | **Planejamento** | `architect` | Trade-offs, ADRs, diagramas, design de sistemas |
